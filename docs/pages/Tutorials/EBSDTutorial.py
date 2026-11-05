@@ -107,7 +107,7 @@ grains
 # -
 
 # smooth only the boundary geometry
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # The returned [grain2d](grain2d.grain2d.html) object is a vectorized list of grains. Its
 # display reports the count by phase and the available grain properties.
@@ -229,9 +229,8 @@ mtexColorbar()
 
 # ## Technical Details
 #
-# `calcGrains(ebsd, angle=10*degree, minPixel=5)` gives 20, 489, 209 and 167 notIndexed,
-# forsterite, enstatite and diopside grains and 36193 boundary segments where MATLAB has 9,
-# 489, 208, 167 and 35402: the fragments the second segmentation leaves below minPixel are
-# notIndexed grains here, and a small difference in the segmentation remains, as on the
-# other forsterite pages. The 262 forsterite grains above 100
-# pixels agree, with 142943 pixels for MATLAB's 142951.
+# `calcGrains(ebsd, angle=10*degree, minPixel=5)` gives 5, 489, 208 and 167 notIndexed,
+# forsterite, enstatite and diopside grains and 35924 boundary segments where MATLAB has 9,
+# 489, 208, 167 and 35402; a small difference in the segmentation remains, as on the other
+# forsterite pages. The 262 forsterite grains above 100 pixels agree, with 142954 pixels for
+# MATLAB's 142951.

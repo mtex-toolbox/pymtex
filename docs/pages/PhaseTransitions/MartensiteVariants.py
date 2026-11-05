@@ -32,7 +32,7 @@ csAus = ebsd['Aus'].CS
 
 # segment and smooth the grains
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=2)
-grains = smoothBoundary(grains, 4)
+grains = smoothBoundary(grains)
 # -
 
 # ## Inspect the retained parent phase

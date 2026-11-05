@@ -48,7 +48,7 @@ ebsd = ebsd[inpolygon(ebsd, [40, 30, 80, 60])]
 
 grainsHard = calcGrains(ebsd.copy(), angle=10 * degree, minPixel=10)
 print(f'hard threshold: {grainsHard.size} grains')
-grainsHard = smoothBoundary(grainsHard, 5)
+grainsHard = smoothBoundary(grainsHard)
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)
@@ -63,7 +63,7 @@ mtexTitle('Hard threshold')
 # +
 grainsHardMCL = calcGrains(ebsd.copy(), mcl=(1.2, 4), angle=10 * degree, minPixel=10)
 print(f'hard threshold + MCL: {grainsHardMCL.size} grains')
-grainsHardMCL = smoothBoundary(grainsHardMCL, 5)
+grainsHardMCL = smoothBoundary(grainsHardMCL)
 
 hold(True)
 plot(grainsHardMCL.boundary, lineWidth=3, lineColor='white')
@@ -82,7 +82,7 @@ mtexTitle('Hard threshold + MCL')
 # +
 grainsSoft = calcGrains(ebsd.copy(), criterion=gbcSoft(1 * degree, 0.5 * degree), minPixel=10)
 print(f'soft threshold: {grainsSoft.size} grains')
-grainsSoft = smoothBoundary(grainsSoft, 5)
+grainsSoft = smoothBoundary(grainsSoft)
 
 hold(True)
 plot(grainsSoft.boundary, lineWidth=1, lineColor='gray')
@@ -98,7 +98,7 @@ mtexTitle('Soft threshold without MCL')
 # +
 grainsSoftMCL = calcGrains(ebsd.copy(), mcl=(1.2, 4), criterion=gbcSoft(1 * degree, 0.5 * degree), minPixel=10)
 print(f'soft threshold + MCL: {grainsSoftMCL.size} grains')
-grainsSoftMCL = smoothBoundary(grainsSoftMCL, 5)
+grainsSoftMCL = smoothBoundary(grainsSoftMCL)
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)

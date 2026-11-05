@@ -131,7 +131,7 @@ plottingConvention.default('y↓→x')
 ebsd = mtexdata('csl')
 
 grains = calcGrains(ebsd, minPixel=3)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 # -
 
 # Apply the same plane strain to every grain. The inverse mean orientations express it in

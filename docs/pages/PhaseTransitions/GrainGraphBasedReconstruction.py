@@ -25,7 +25,7 @@ ebsd = mtexdata('martensite', verbose=False)
 
 # +
 grains = calcGrains(ebsd, angle=3 * degree, minPixel=5, alpha=6.1)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 plot(ebsd['Iron bcc'], ipfDirection=zvector, figSize='large')
 hold(True)
@@ -56,7 +56,7 @@ fitQuantilesInitial
 # -
 
 # The former page reported initial fit quintiles of 2.5, 3.5, 4.5, and 5.5 degrees. This run
-# gives 2.363, 3.371, 4.431, and 5.501 degrees.
+# gives 2.365, 3.372, 4.431, and 5.501 degrees.
 # [Parent Austenite Reconstruction](MaParentGrainReconstruction.html) shows how to overlay the
 # full histograms and map the fit onto boundary segments.
 
@@ -73,8 +73,8 @@ changeFromKS
 
 # [`calcParent2Child`](parentGrainReconstructor.calcParent2Child.html) uses the iterative
 # method of Nyyssönen and co-workers. It assumes that most measured boundaries are
-# child-to-child boundaries. The first fit quintile is 1.453 degrees, consistent with the
-# former rounded value of 1.5 degrees. The change from KS is 3.110 degrees, not 2.3 degrees.
+# child-to-child boundaries. The first fit quintile is 1.477 degrees, consistent with the
+# former rounded value of 1.5 degrees. The change from KS is 3.068 degrees, not 2.3 degrees.
 # The 2.3-degree value in the displayed summary is the distance to the closest rounded ideal
 # OR, so the earlier text compared two different quantities.
 #
@@ -109,8 +109,8 @@ graphWeightQuantiles
 # -
 
 # The printed count is the number of weighted neighbour relations retained by the graph:
-# 11,154 in this run. Its 10th, 50th, and 90th weight percentiles are 0.0080, 0.6677, and
-# 0.9464.
+# 11,159 in this run. Its 10th, 50th, and 90th weight percentiles are 0.0083, 0.6600, and
+# 0.9448.
 #
 # ## Read the graph on the map
 #
@@ -137,7 +137,7 @@ job.clusterGraph(inflationPower=1.6)
 job
 
 # The displayed graph summary gives clustered grains, component count, and single-grain
-# components. Here 4,414 grains form 237 components and 54 components contain only one grain.
+# components. Here 4,413 grains form 238 components and 52 components contain only one grain.
 # These are hypotheses, not yet accepted parent grains.
 #
 # ## Transform grains from the graph components
@@ -156,8 +156,8 @@ print(numGraphTransformed)
 plot(job.parentGrains, ipfDirection=zvector)
 # -
 
-# Most child grains now appear in the parent phase. The graph transforms 4,414 grains and
-# leaves 52 child grains unchanged. Neighbouring fragments with similar colours belong to graph
+# Most child grains now appear in the parent phase. The graph transforms 4,413 grains and
+# leaves 51 child grains unchanged. Neighbouring fragments with similar colours belong to graph
 # components that still await quality control and merging.
 #
 # ## Diagnose and reject weak components
@@ -192,8 +192,8 @@ plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # [`revert`](parentGrainReconstructor.revert.html) restores the measured child phase and
-# orientation for the rejected grains. The criteria flag 848 grains. Of those, 54 carry no
-# graph assignment to undo, so this call reverts 794 of them and leaves 846 child grains.
+# orientation for the rejected grains. The criteria flag 852 grains. Of those, 52 carry no
+# graph assignment to undo, so this call reverts 800 of them and leaves 851 child grains.
 # Called without an argument, `job.revert()` undoes the entire reconstruction. That full reset
 # is useful when comparing graph parameters.
 #
@@ -214,8 +214,8 @@ print(childGrainsAfterVote)
 plot(job.parentGrains, ipfDirection=zvector)
 # -
 
-# The printed sequence should decrease as the reconstructed neighbourhood expands. It is 614,
-# 387, and 174 child grains in this run. The final map fills most rejected regions without
+# The printed sequence should decrease as the reconstructed neighbourhood expands. It is 611,
+# 390, and 190 child grains in this run. The final map fills most rejected regions without
 # accepting their original weak graph assignments.
 #
 # ## Merge parent fragments and inclusions
@@ -255,7 +255,7 @@ packetColor = ind2color(job.transformedGrains.packetId - 1)
 plot(job.transformedGrains, packetColor, faceAlpha=0.5)
 
 hold(True)
-parentGrains = smoothBoundary(job.parentGrains, 10)
+parentGrains = smoothBoundary(job.parentGrains)
 plot(parentGrains.boundary, lineWidth=3)
 grainSelected = parentGrains[parentGrains.findByLocation([100, 80])]
 plot(grainSelected.boundary, lineWidth=3, lineColor='w')
@@ -294,16 +294,16 @@ pixelFitQuantiles = np.nanquantile(pixelFit, [0.5, 0.9, 0.99])
 pixelFitQuantiles
 
 # The printed fit quantiles are the compact numerical check for this graph reconstruction. The
-# median, 90th, and 99th percentiles are 2.234, 4.155, and 7.149 degrees. Low values mean the
+# median, 90th, and 99th percentiles are 2.270, 4.196, and 7.190 degrees. Low values mean the
 # measured child pixels agree with their assigned parent orientation.
 #
 # To fill remaining notIndexed or not reconstructed pixels, the earlier page segments
-# `parentEBSD` at 3 degrees with `minPixel=10`, smooths the parent boundaries by 10
-# iterations, and applies a `halfQuadraticFilter`:
+# `parentEBSD` at 3 degrees with `minPixel=10`, smooths the parent boundaries, and
+# applies a `halfQuadraticFilter`:
 #
 # ```python
 # parentGrains = calcGrains(parentEBSD, angle=3 * degree, minPixel=10)
-# parentGrains = smoothBoundary(parentGrains, 10)
+# parentGrains = smoothBoundary(parentGrains)
 # F = halfQuadraticFilter()
 # parentEBSD = smooth(parentEBSD['indexed'], F, parentGrains)
 # ```
@@ -313,12 +313,11 @@ pixelFitQuantiles
 #
 # ## Technical Details
 #
-# On this segmentation the port's `calcParent2Child` reaches a lower misfit basin than MATLAB's
-# (first quintile 1.19 against 1.45 degrees, 3.43 against 3.11 degrees from KS), so every
-# count after the fit differs from the text. With MATLAB's fitted relationship set as
-# `job.p2c` the graph route gives MATLAB's numbers: 11,149 edges with weight percentiles
-# 0.0083, 0.668 and 0.946, 4,411 grains in 236 components with 54 single grains, 839 grains
-# rejected, and 606, 380 and 176 child grains after the three voting passes.
+# The port's `calcParent2Child` gives a first quintile of 1.477 degrees and 3.068 degrees from
+# KS, for MATLAB's 1.452 and 3.095, and the counts after the fit differ from MATLAB's by a
+# few grains: 11,159 edges for 11,160, 4,413 grains in 238 components for 4,412 in 236, 852
+# grains rejected for 874, and 611, 390 and 190 child grains after the three voting passes
+# for 616, 380 and 174.
 #
 # ## References
 #

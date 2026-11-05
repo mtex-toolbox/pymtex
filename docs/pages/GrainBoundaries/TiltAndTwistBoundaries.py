@@ -41,7 +41,7 @@ ebsd = mtexdata('forsterite')
 grains = calcGrains(ebsd, threshold=[1 * degree, 15 * degree], minPixel=5)
 
 # smooth traces without breaking the segment-to-pixel relation
-grains = smoothBoundary(grains, 5, simplify=False)
+grains = smoothBoundary(grains, simplify=False)
 
 # set up the IPF colouring
 cKey = ipfColorKey(ebsd['fo'].CS.properGroup())

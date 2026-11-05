@@ -35,7 +35,7 @@ lowAngle = 1 * degree
 grains = calcGrains(ebsd, angle=[highAngle, lowAngle], minPixel=3)
 
 # smooth grain boundaries
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # denoise the orientations
 F = halfQuadraticFilter()
@@ -80,9 +80,9 @@ grodAngle = angle(grod) / degree
 print(f'GROD angle: median {np.nanmedian(grodAngle):.2f} degree; maximum {np.nanmax(grodAngle):.1f} degree')
 # -
 
-# Half the measurements are within about 1.6° of their grain mean and the worst reach
-# about 19°. The large values are not scattered. They fill extended parts of grains and
-# often end at the inner boundaries.
+# Half the measurements are within 1.70° of their grain mean and the worst reach 23.8°.
+# The large values are not scattered. They fill extended parts of grains and often end at
+# the inner boundaries.
 #
 # Those boundaries were detected from local neighbour misorientations, not from GROD. A
 # [subgrain boundary](SubGrainBoundaries.html) can coincide with a jump in GROD, but a
@@ -105,7 +105,7 @@ mtexColorbar(title='GOS in degree')
 print(f'GOS for {len(grains)} grains: median {np.nanmedian(GOS / degree):.2f} degree; maximum {np.nanmax(GOS / degree):.1f} degree')
 # -
 
-# Of the 377 grains the median spread is below a degree and the largest 6.6°. The map is
+# Of the 377 grains the median spread is 0.84° and the largest 6.9°. The map is
 # not uniform. Some grains have much more internal orientation variation than their
 # neighbours, producing an order-of-magnitude spread.
 #
@@ -128,7 +128,7 @@ crystalDensityRange = h[0].get_clim()
 print(f'Crystal-frame axis density: {crystalDensityRange[0]:.2f} to {crystalDensityRange[1]:.2f} mrd')
 # -
 
-# The range is close to uniform, about 0.8 to 1.2 times. In crystal coordinates the axes
+# The range is close to uniform, 0.86 to 1.21 times. In crystal coordinates the axes
 # are therefore close to evenly distributed, with a slight preference for $[101]$. A
 # colour key shows where those directions occur in the map.
 
@@ -201,7 +201,7 @@ specimenDensityRange = h[0].get_clim()
 print(f'Specimen-frame axis density: {specimenDensityRange[0]:.2f} to {specimenDensityRange[1]:.2f} mrd')
 # -
 
-# This distribution runs from about 0.2 to nearly 7 times uniform. The same axes that
+# This distribution runs from 0.25 to 6.28 times uniform. The same axes that
 # were spread evenly over the crystal are strongly clustered in the specimen frame.
 # Loading is defined in this frame, which makes the clustering useful. Texture and a few
 # highly deformed grains can also produce maxima; the map below distinguishes those

@@ -160,7 +160,7 @@ hold(False)
 # [Grain Reconstruction](GrainReconstruction.html) explains that step.
 
 grains = calcGrains(ebsd, angle=1.5 * degree, minPixel=5)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # The segmentation threshold is 1.5 degrees, far below the commonly used 10 degrees. It
 # separates the small changes that this page is intended to reveal. The resulting

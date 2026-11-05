@@ -57,7 +57,7 @@ uniformRange, uniformRatio
 # A grain is a phase-homogeneous, spatially connected region of EBSD pixels produced by
 # segmentation. A grain boundary is a segment between two neighbouring pixels that belong to
 # different grains. Load the magnesium map, segment its indexed pixels at $5^\circ$, and
-# smooth the boundary geometry for five iterations. The plotting convention states the
+# smooth the boundary geometry. The plotting convention states the
 # specimen frame used by this data set.
 
 # +
@@ -65,7 +65,7 @@ plottingConvention.default('y↑→x')
 ebsd = mtexdata('twins', verbose=False)
 
 grains = calcGrains(ebsd, angle=5 * degree)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # retain boundaries between magnesium grains
 gB = grains.boundary['Magnesium', 'Magnesium']
@@ -74,7 +74,7 @@ mori = gB.misorientation
 
 # [axis](orientation.axis.html) selects the smallest-angle symmetry-equivalent
 # representative and returns its axis in the crystal frame. The summary reports one axis
-# for each of the 2803 boundary segments.
+# for each of the 1394 boundary segments.
 
 axesCrystal = axis(mori)
 axesCrystal
@@ -87,7 +87,7 @@ plotAxisDistribution(mori, contourf=True, halfwidth=5 * degree, weights=gB.segLe
 mtexColorbar()
 
 # The isolated maximum is the extension-twin prism axis. Computing the underlying spherical
-# density returns a peak of 30.8 multiples of the mean and prints the indexed direction at
+# density returns a peak of 31.4 multiples of the mean and prints the indexed direction at
 # that peak.
 
 # +
@@ -131,7 +131,7 @@ mtexColorbar()
 # without simplification, as the help of `smoothBoundary` advises.
 
 # +
-gBp = smoothBoundary(calcGrains(ebsd, angle=5 * degree), 5, simplify=False)
+gBp = smoothBoundary(calcGrains(ebsd, angle=5 * degree), simplify=False)
 gBp = gBp.boundary['Magnesium', 'Magnesium']
 ori1 = ebsd['id', gBp.ebsdId[:, 0]].orientations
 ori2 = ebsd['id', gBp.ebsdId[:, 1]].orientations

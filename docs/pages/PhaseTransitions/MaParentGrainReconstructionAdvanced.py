@@ -71,8 +71,8 @@ boundaryFitQuantiles
 
 # [`calcParent2Child`](calcParent2Child.html) assumes that most retained pairs are
 # child-to-child boundaries. It adjusts the OR to reduce their mismatch from theoretical
-# child-to-child misorientations. The fitted OR is 3.132 degrees from KS. Its 20th, 40th,
-# 60th, and 80th fit percentiles are 1.483, 2.018, 2.613, and 4.207 degrees.
+# child-to-child misorientations. The fitted OR is 3.071 degrees from KS. Its 20th, 40th,
+# 60th, and 80th fit percentiles are 1.499, 2.034, 2.620, and 4.171 degrees.
 
 plt.close('all')
 plt.hist(boundaryFit / degree, bins=50)
@@ -139,7 +139,7 @@ print(boundaryProbabilityQuantiles)
 boundaryA = coo_matrix((boundaryProbability, (grainPairs[:, 0] - 1, grainPairs[:, 1] - 1)), shape=(len(grains), len(grains))).tocsr()
 # -
 
-# The 10th, 50th, and 90th similarity percentiles are 0, 0.3040, and 0.9475. The zero-valued
+# The 10th, 50th, and 90th similarity percentiles are 0, 0.2899, and 0.9450. The zero-valued
 # low tail corresponds to badly fitting pairs that should not bind a component.
 #
 # ## Cluster the boundary graph
@@ -157,7 +157,7 @@ boundaryA = mclComponents(boundaryA, boundaryInflationPower)
 # +
 boundaryParentGrains = grains.merge(boundaryA)
 boundaryParentId = grains.parentId
-boundaryParentGrains = smoothBoundary(boundaryParentGrains, 20)
+boundaryParentGrains = smoothBoundary(boundaryParentGrains)
 numBoundaryComponents = len(boundaryParentGrains)
 numBoundaryComponents
 # -
@@ -177,7 +177,7 @@ plot(boundaryParentGrains.boundary, lineWidth=2, lineColor='black')
 hold(False)
 # -
 
-# The graph produces 707 candidate components, shown by the double outlines. The components
+# The graph produces 722 candidate components, shown by the double outlines. The components
 # need not have their final size because similarly oriented neighbours can be merged after
 # parent orientations are fitted.
 #
@@ -212,7 +212,7 @@ boundaryParentGrains[acceptComponent] = componentOri[acceptComponent]
 #
 # Accepted components have changed from bcc child phase to fcc parent phase. A 4-degree merge
 # combines neighbouring fcc components with similar orientations and returns a second ID
-# mapping. Of the 707 components, 360 pass the child-count and 5-degree fit tests.
+# mapping. Of the 722 components, 373 pass the child-count and 5-degree fit tests.
 
 # +
 numParentsBeforeOrientationMerge = len(boundaryParentGrains['Iron fcc'])
@@ -231,7 +231,7 @@ print(numParentsAfterOrientationMerge)
 plot(boundaryParentGrains['Iron fcc'], ipfDirection=zvector, figSize='large')
 # -
 
-# The orientation merge reduces 360 accepted components to 222 fcc parent grains. Their
+# The orientation merge reduces 373 accepted components to 221 fcc parent grains. Their
 # colours identify the reconstructed parent orientations. Neighbours with similar colours have
 # coalesced into larger footprints.
 #
@@ -260,9 +260,8 @@ hold(False)
 # -
 
 # Equal colours identify child grains in the same packet. Black lines show reconstructed
-# parent boundaries, and the white line selects one parent at [100,80]. Earlier prose called
-# it parent 279; this run returns ID 557. The executable lookup avoids assuming that a
-# release-sensitive ID remains fixed.
+# parent boundaries, and the white line selects the parent at [100,80]. It is looked up by
+# location, because a grain ID depends on the reconstruction details.
 #
 # ## Check the selected parent's variants
 #
@@ -313,8 +312,8 @@ mtexColorMap('LaboTeX')
 mtexColorbar(title='fit (degrees)')
 setColorRange([0, 5])
 
-# The median pixel fit is 1.830 degrees, 90% are below 3.768 degrees, and 99% are below
-# 10.572 degrees. Low values indicate agreement between a martensite pixel and the variant
+# The median pixel fit is 2.242 degrees, 90% are below 4.061 degrees, and 99% are below
+# 11.337 degrees. Low values indicate agreement between a martensite pixel and the variant
 # predicted from its austenite grain.
 #
 # ## Denoise and fill missing sites
@@ -379,8 +378,8 @@ mtexColorMap('LaboTeX')
 mtexColorbar(title='triple-point fit (degrees)')
 # -
 
-# The 20th, 40th, 60th, and 80th triple-point fit percentiles are 2.648, 3.232, 4.015, and
-# 6.295 degrees. Large-fit points often join into parent outlines. Low-fit points support
+# The 20th, 40th, 60th, and 80th triple-point fit percentiles are 2.663, 3.250, 4.030, and
+# 6.402 degrees. Large-fit points often join into parent outlines. Low-fit points support
 # removing all three child boundaries.
 #
 # ## Build and cluster the triple-point similarity matrix
@@ -407,7 +406,7 @@ tripleA = mclComponents(tripleA, tripleInflationPower)
 
 tripleParentGrains = grains.merge(tripleA)
 tripleParentId = grains.parentId
-tripleParentGrains = smoothBoundary(tripleParentGrains, 20)
+tripleParentGrains = smoothBoundary(tripleParentGrains)
 numTripleComponents = len(tripleParentGrains)
 print(numTripleComponents)
 
@@ -421,8 +420,8 @@ plot(tripleParentGrains.boundary, lineWidth=2)
 hold(False)
 # -
 
-# The triple-point probability has 10th, 50th, and 90th percentiles of 0, 0.2032, and 0.8536.
-# Clustering produces 779 candidate parent footprints. Their outlines are shown above. At this
+# The triple-point probability has 10th, 50th, and 90th percentiles of 0, 0.1980, and 0.8455.
+# Clustering produces 803 candidate parent footprints. Their outlines are shown above. At this
 # stage they still carry child orientations and phases. Fit their common parent orientations,
 # reject weak components, remap the pixels, and merge similar parents with the same sequence
 # used above.
@@ -435,14 +434,12 @@ hold(False)
 #
 # ## Technical Details
 #
-# Two things separate the numbers here from the text. The port's `calcParent2Child` reaches a
-# lower misfit basin (first quintile 1.22 against 1.48 degrees), and every count after the fit
-# follows the fitted relationship. And the segmentation with `removeQuadruplePoints` gives
-# 4,467 grains and 11,233 retained pairs where MATLAB has 4,443 and 11,290, a difference of the
-# quadruple point removal rather than of this page, which the Markov clustering amplifies: with
-# MATLAB's fitted relationship set by hand the page gives 725 boundary components against 707,
-# 361 accepted against 360, and the triple-point fits and similarities to three digits
-# (2.646, 3.227, 4.013 degrees for the first three quintiles).
+# The port's `calcParent2Child` gives a first quintile of 1.499 degrees and 3.071 degrees from
+# KS, for MATLAB's 1.522 and 3.258, and every count after the fit follows the fitted
+# relationship, the small differences amplified by the Markov clustering: 722 boundary
+# components for MATLAB's 712, 373 accepted for 377, 221 parent grains after the orientation
+# merge for 207, and 803 triple-point components for 690. The pixel fit quantiles, 2.242,
+# 4.061 and 11.337 degrees, lie above MATLAB's 1.751, 3.539 and 10.332.
 #
 # ## References
 #

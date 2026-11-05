@@ -41,7 +41,7 @@ grainsRaw
 # not change grain IDs, pixel counts, or mean orientations. We therefore keep `grainsRaw`
 # for measurement-level boundary data and use a smoothed copy for shape data.
 
-grains = smoothBoundary(grainsRaw, 5)
+grains = smoothBoundary(grainsRaw)
 
 # ## Export a grain table
 #

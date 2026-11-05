@@ -68,7 +68,7 @@ grains = calcGrains(ebsd, angle=5 * degree, minPixel=3)
 # list.
 
 # +
-grains = smoothBoundary(grains, 10, simplify=False)
+grains = smoothBoundary(grains, simplify=False)
 CS = grains.CS
 
 # compute IPF colours explicitly to keep the published output quiet
@@ -160,7 +160,7 @@ remainingSummary
 # -
 
 # The peak lies 5.6 degrees from the nearest tension-twin plane. The remaining
-# distribution ranges from 0.86 to 1.09. These values quantify the visual contrast between
+# distribution ranges from 0.84 to 1.09. These values quantify the visual contrast between
 # the panels.
 
 # ## The grain boundary character distribution
@@ -183,7 +183,7 @@ mtexColorbar()
 # -
 
 # Two of the six $\{10\bar{1}2\}$ variants carry the maxima. The specimen was deformed, so
-# not every twin variant is equally active. The strongest maximum sits directly on a
+# not every twin variant is equally active. The strongest maximum sits close to a
 # tension-twin plane.
 
 # +
@@ -193,8 +193,9 @@ twinGBCDSummary = {'peakDensity': twinPeak,
 twinGBCDSummary
 # -
 
-# The printed angular distance is 1.3 degrees. Conditioning on the complete misorientation
-# sharpens the habit-plane result compared with the angle-only split.
+# The printed angular distance is 5.4 degrees, against 5.6 degrees for the angle-only
+# split, while the peak density rises from 1.32 to 1.97. Conditioning on the complete
+# misorientation sharpens the habit-plane result.
 
 # ## Three-dimensional data
 #
@@ -368,10 +369,7 @@ sigma3GBCDSummary
 # integral equation of the section and agrees with MATLAB's to the digit, or with the
 # `nonneg` and `bump` kernels. The crystal GBND takes the symmetry of the phase, as the
 # numbers of the page require: without it the peak lies 8.4 degrees from the twin plane.
-# The high-angle GBND peaks at 1.3912, 5.58 degrees from the twin plane, for MATLAB's
-# 1.3905 and 5.60. The tension-twin GBCD peaks at 2.19, 4.8 degrees from the twin plane,
-# where MATLAB's peaks at 2.10, 1.3 degrees from it, and the Julia port at about one
-# degree; both take the same 1648 segments within ten degrees of the twin relation, whose
-# traces lie as close to the twin planes in both, so the difference is in how the traces
-# are assigned to the equivalent planes, and it is open. The three-dimensional half gives
+# The high-angle GBND peaks at 1.3217, 5.61 degrees from the twin plane, for MATLAB's
+# 5.6. The tension-twin GBCD peaks at 1.97, 5.4 degrees from the twin plane, where
+# MATLAB's lies 2.8 degrees from it; the difference is open. The three-dimensional half gives
 # MATLAB's numbers. MATLAB's tables are dictionaries here.

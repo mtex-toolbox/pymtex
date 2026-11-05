@@ -168,13 +168,13 @@ for minPixel in [1, 5, 10]:
 # Because the boundaries run between measurement points, they follow the measurement grid
 # in steps - the staircase effect. This is a property of the reconstruction, not of the
 # material. It biases measurements such as boundary length and direction. The command
-# `smoothBoundary` first simplifies the staircase, then resamples the boundary at even
-# spacing, and finally applies a smoothing filter. With the default filter, its numeric
-# argument is the number of Laplacian smoothing iterations.
+# `smoothBoundary` first smooths the staircase, never moving the boundary across the centre
+# of a pixel next to it, and then merges the straightened segments. An optional second
+# argument sets the number of smoothing steps.
 
 # +
 grains = calcGrains(ebsd, angle=10 * degree, minPixel=5)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 plot(ebsd, micronbar=False)
 hold(True)
@@ -250,7 +250,7 @@ plot(ebsd, ipfDirection=zvector)
 # angle. The figure shows several such low-angle boundaries with no black line on them.
 
 # +
-grains = smoothBoundary(calcGrains(ebsd, angle=10 * degree, minPixel=10), 5)
+grains = smoothBoundary(calcGrains(ebsd, angle=10 * degree, minPixel=10))
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)
@@ -264,7 +264,7 @@ hold(False)
 # grain boundaries.
 
 # +
-grains = smoothBoundary(calcGrains(ebsd, angle=0.5 * degree, minPixel=10), 5)
+grains = smoothBoundary(calcGrains(ebsd, angle=0.5 * degree, minPixel=10))
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)
@@ -286,7 +286,7 @@ hold(False)
 # Larger values return more grains.
 
 # +
-grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=0.5, minPixel=10), 5)
+grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=0.5, minPixel=10))
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)
@@ -301,7 +301,7 @@ hold(False)
 # dislocation cells that carry the deformation.
 
 # +
-grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=1.5, minPixel=10), 5)
+grains = smoothBoundary(calcGrains(ebsd.copy(), fmc=1.5, minPixel=10))
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)
@@ -317,7 +317,7 @@ hold(False)
 # +
 ebsd = mtexdata('EMSphinx')['Iron fcc']
 
-grains = smoothBoundary(calcGrains(ebsd, fmc=1.5, minPixel=10, verbose=True), 5)
+grains = smoothBoundary(calcGrains(ebsd, fmc=1.5, minPixel=10, verbose=True))
 
 plot(ebsd, ipfDirection=zvector)
 hold(True)

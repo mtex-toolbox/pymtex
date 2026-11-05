@@ -26,7 +26,7 @@ ebsd = mtexdata('twins')
 
 # reconstruct and smooth the grains
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=3)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 grains = grains['indexed']
 
 # compute the mean-orientation colours without printing a colour-key notice
@@ -66,9 +66,9 @@ hold(True)
 plot(twinBoundary, lineColor='w', lineWidth=4, displayName='candidate twin boundary')
 hold(False)
 
-# The white traces follow the narrow lamellae. With this boundary sampling, 1406 of 2696
+# The white traces follow the narrow lamellae. With this boundary sampling, 730 of 1260
 # magnesium-to-magnesium segments pass the five-degree test. A segment count is not a count
-# of physical twins, and smoothing or resampling the same traces can change it. The
+# of physical twins, and smoothing the same traces can change it. The
 # tolerance is also an analyst choice: these are candidate twin boundaries, not proof of
 # the mechanism or of which side is the parent.
 # [Inferring Twin Boundaries](TwinningBoundaries.html) develops those limitations.

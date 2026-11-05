@@ -86,7 +86,7 @@ job
 # -
 
 # The fitted OR is 2.5 degrees from the ideal Nishiyama-Wassermann OR. Its first misfit
-# quintile is 1.3 degrees, rather than 2.5 degrees. The fitted histogram is therefore shifted
+# quintile is 1.2 degrees, rather than 2.5 degrees. The fitted histogram is therefore shifted
 # towards smaller disorientations.
 #
 # The earlier version of this page said that `calcParent2Child` stored these values in
@@ -180,7 +180,7 @@ plot(job.parentGrains, ipfDirection=zvector)
 # -
 
 # The map contains transformed parent fragments rather than final parent grain footprints. The
-# strict vote transforms 10,581 child grains, leaving 64 child grains that occupy 0.59% of the
+# strict vote transforms 10,580 child grains, leaving 65 child grains that occupy 0.65% of the
 # indexed area. A manual alternative is
 # [`selectInteractive`](parentGrainReconstructor.selectInteractive.html):
 #
@@ -210,7 +210,7 @@ plot(job.parentGrains, ipfDirection=zvector)
 
 # Earlier versions passed `'tortuosity'` to `calcGBVotes` as well. That function also has no
 # such option, so it had no effect. The new parent fragments fill much of the space left by
-# the strict vote. It leaves 48 child grains, occupying 0.088% of the indexed area.
+# the strict vote. It leaves 46 child grains, occupying 0.077% of the indexed area.
 #
 # ## Merge compatible parent fragments
 #
@@ -221,7 +221,7 @@ plot(job.parentGrains, ipfDirection=zvector)
 
 # +
 job.mergeSimilar(threshold=7.5 * degree)
-job.grains = smoothBoundary(job.grains, 20)
+job.grains = smoothBoundary(job.grains)
 
 plot(job.parentGrains, ipfDirection=zvector)
 # -
@@ -259,7 +259,7 @@ color = ind2color(job.transformedGrains.packetId - 1)
 plot(job.transformedGrains, color, faceAlpha=0.5)
 
 hold(True)
-parentGrains = smoothBoundary(job.parentGrains, 10)
+parentGrains = smoothBoundary(job.parentGrains)
 plot(parentGrains.boundary, lineWidth=3)
 
 grainSelected = parentGrains[parentGrains.findByLocation([100, 80])]
@@ -290,7 +290,7 @@ hold(False)
 # -
 
 # The original page described this grain as parent 279. The printed `selectedParentId` checks
-# that concrete ID against the current segmentation. It is 288 in the current run, showing why
+# that concrete ID against the current segmentation. It is 118 in the current run, showing why
 # IDs should not be assumed to remain fixed across releases. The child-grain mosaic exactly
 # fills the selected parent outline.
 #
@@ -361,7 +361,7 @@ hold(False)
 
 # +
 parentGrains = calcGrains(parentEBSD, angle=3 * degree, minPixel=10)
-parentGrains = smoothBoundary(parentGrains, 20)
+parentGrains = smoothBoundary(parentGrains)
 
 plot(ebsd, ipfDirection=zvector, figSize='large')
 hold(True)

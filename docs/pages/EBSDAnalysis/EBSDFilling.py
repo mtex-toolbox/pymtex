@@ -46,7 +46,7 @@ ebsd
 grains = calcGrains(ebsd, angle=10 * degree, minPixel=5)
 
 # smooth the pixel staircase of the grain boundaries
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # plot the orientation map and its reconstructed grain boundaries
 plot(ebsd, ipfDirection=zvector)
@@ -89,7 +89,7 @@ plot(ebsdSub, ipfDirection=zvector)
 # reconstruct the grain structure
 grainsSub = calcGrains(ebsdSub, angle=9 * degree, minPixel=2, alpha=15)
 
-grainsSub = smoothBoundary(grainsSub, 5)
+grainsSub = smoothBoundary(grainsSub)
 
 hold(True)
 plot(grainsSub.boundary, lineWidth=1.5)
@@ -219,7 +219,7 @@ hold(True)
 
 # compute and smooth grains
 grains = calcGrains(ebsd, angle=10 * degree, minPixel=3, alpha=3)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # plot the boundary of all grains
 plot(grains.boundary, lineWidth=2)

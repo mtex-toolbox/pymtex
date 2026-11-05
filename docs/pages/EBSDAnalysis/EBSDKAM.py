@@ -35,7 +35,7 @@ ebsd = mtexdata('ferrite')
 grains = calcGrains(ebsd, minPixel=8)
 
 # smooth the outlines used as overlays
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # plot the indexed orientations and reconstructed grain boundaries
 ebsdIndexed = ebsd['indexed']
@@ -169,7 +169,7 @@ hold(False)
 # -
 
 # For this example, this is the map to use when examining weak continuous structure. Its
-# median is well below half the 0.59° obtained with thresholding alone. The surviving
+# median is 0.21°, less than half the 0.59° obtained with thresholding alone. The surviving
 # features run continuously through the grains rather than appearing as isolated pixels,
 # which is consistent with local deformation structures.
 #

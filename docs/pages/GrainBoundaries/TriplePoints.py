@@ -34,8 +34,8 @@ ebsd = mtexdata('small')
 # reconstruct the grains and resolve quadruple points
 grains = calcGrains(ebsd, removeQuadruplePoints=True, alpha=5)
 
-# smooth the pixel staircase while keeping junctions fixed
-grains = smoothBoundary(grains, 2)
+# smooth the pixel staircase, each junction staying within its pixel cell
+grains = smoothBoundary(grains)
 
 # draw the grains and overlay all triple points
 plot(grains)
@@ -239,8 +239,8 @@ mtexColorbar()
 # ## Technical Details
 #
 # A tuple of phase names in brackets selects triple points, MATLAB's
-# `tP('Forsterite','Forsterite')`. At MATLAB's default of 15 degrees the port finds 68
-# triple points where MATLAB finds 70, the 14 between three forsterite grains as MATLAB's,
-# and 217 forsterite boundary segments for MATLAB's 220: the not indexed third of this map
-# is closed by the neighbouring grains a little differently, and `alpha` does not change
-# the closing here, as [Grain Reconstruction](GrainReconstruction.html) says.
+# `tP('Forsterite','Forsterite')`. At MATLAB's default of 15 degrees the port finds 69
+# triple points, 15 of them between three forsterite grains, and 138 forsterite boundary
+# segments after the smoothing; the not indexed third of this map is closed by the
+# neighbouring grains, and `alpha` does not change the closing here, as
+# [Grain Reconstruction](GrainReconstruction.html) says.

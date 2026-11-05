@@ -32,13 +32,13 @@ beta2alpha
 # ## Segment grains for triple-point analysis
 #
 # The preceding page defines a triple point and explains why this workflow uses a 1.5-degree
-# segmentation threshold with [`removeQuadruplePoints`](QuadruplePoints.html). We add one
-# boundary-smoothing step. The triple points move with the boundary network, each within its
-# pixel cell.
+# segmentation threshold with [`removeQuadruplePoints`](QuadruplePoints.html). We smooth the
+# boundaries. The triple points move with the boundary network, each within its pixel
+# cell.
 
 # +
 grains = calcGrains(ebsd, threshold=1.5 * degree, removeQuadruplePoints=True)
-grains = smoothBoundary(grains, 1)
+grains = smoothBoundary(grains)
 
 region = [299, 401, 440, 500]
 plot(ebsd[alphaName], ipfDirection=zvector, region=region, micronbar='off', figSize='large')
@@ -103,7 +103,7 @@ plot(tP[consistentTP], markerEdgeColor='r', markerSize=10, markerFaceColor='none
 hold(False)
 # -
 
-# Red circles mark 54,868 retained seeds. Many survive even though the best-fit cutoff is
+# Red circles mark 54,856 retained seeds. Many survive even though the best-fit cutoff is
 # sharp. The next check asks whether a grain receives compatible variant IDs from all of its
 # retained triple points.
 #
@@ -133,7 +133,7 @@ parentColor = ipfKey.orientation2color(parentGrains[betaName].meanOrientation)
 plot(parentGrains[betaName], parentColor, figSize='large')
 # -
 
-# The vote requirement transforms 26,828 child grains into coloured beta fragments. Their
+# The vote requirement transforms 26,821 child grains into coloured beta fragments. Their
 # footprints still follow the original alpha boundaries because no merge has occurred.
 #
 # ## Reject isolated seeds before merging
@@ -154,7 +154,7 @@ parentGrains[setBack] = grains[setBack].meanOrientation
 # -
 
 # Only the seeded grains can be set back, so `hasSeed` restricts the test to them. This check
-# reverts the 9 seeds that would have stood alone and leaves 26,819 of the 26,828 in place. It
+# reverts the 9 seeds that would have stood alone and leaves 26,812 of the 26,821 in place. It
 # can be omitted when independent single-grain parents are plausible.
 #
 # ## Merge the accepted seed fragments
@@ -205,7 +205,7 @@ pairFitQuantiles
 # -
 
 # The first returned ID selects the alpha variant compatible with its beta neighbour. Its fit
-# quartiles are 0.966, 1.427, and 2.129 degrees. The second fit exposes whether that choice is
+# quartiles are 0.966, 1.426, and 2.129 degrees. The second fit exposes whether that choice is
 # unambiguous.
 #
 # ## Transform alpha grains supported by boundary pairs
@@ -244,7 +244,7 @@ parentColor = ipfKey.orientation2color(parentGrains[betaName].meanOrientation)
 plot(parentGrains[betaName], parentColor, lineWidth=2, figSize='large')
 # -
 
-# Of 16,251 consistent pairs, the majority vote transforms 16,205 alpha grains. The
+# Of 16,256 consistent pairs, the majority vote transforms 16,210 alpha grains. The
 # unreconstructed alpha area is then 1.207%. Repeating the pair-vote step with gradually
 # increasing thresholds can grow the reconstruction further, but each relaxation also accepts
 # weaker fits.
@@ -284,7 +284,7 @@ plot(parentGrains.boundary, lineWidth=2)
 hold(False)
 # -
 
-# The median pixel fit is 1.183 degrees, 90% are below 2.087 degrees, and 99% are below 3.209
+# The median pixel fit is 1.184 degrees, 90% are below 2.088 degrees, and 99% are below 3.210
 # degrees. Low values indicate agreement with the Burgers variant predicted by the beta grain.
 # The boundary overlay shows whether high fits concentrate near reconstructed grain edges.
 
@@ -297,10 +297,10 @@ plot(parentEBSD[betaName], parentColor, figSize='large')
 # ## Denoise the reconstructed beta phase
 #
 # Segment the current parent map at 5 degrees and mark indexed grains smaller than 15 pixels
-# as notIndexed. Five smoothing iterations regularize the retained boundaries.
+# as notIndexed. Smoothing regularizes the retained boundaries.
 
 parentGrains = calcGrains(parentEBSD, angle=5 * degree, minPixel=15)
-parentGrains = smoothBoundary(parentGrains, 5)
+parentGrains = smoothBoundary(parentGrains)
 
 # A [`halfQuadraticFilter`](halfQuadraticFilter.html) with a small `alpha` preserves more
 # local detail. The `fill` option interpolates missing orientations inside the supplied grain
@@ -357,8 +357,8 @@ plot(parentGrains.boundary, lineWidth=3)
 hold(False)
 # -
 
-# The median deviation from the grain mean is 1.160 degrees, 90% are below 2.054 degrees, and
-# 99% are below 3.147 degrees. Colour changes inside a boundary reveal structure that an IPF
+# The median deviation from the grain mean is 1.163 degrees, 90% are below 2.058 degrees, and
+# 99% are below 3.152 degrees. Colour changes inside a boundary reveal structure that an IPF
 # map of grain means would hide. Large coherent deviations can indicate deformation or an
 # over-merged grain.
 #

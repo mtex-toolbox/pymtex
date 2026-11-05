@@ -48,7 +48,7 @@ plot(cS, colored=True)
 grains = calcGrains(ebsd, minPixel=5)
 
 # smooth the pixel staircase of the grain boundaries
-grains = smoothBoundary(grains, 10)
+grains = smoothBoundary(grains)
 
 # draw the boundaries and add crystals only to large grains
 plot(grains.boundary, lineWidth=1.5, micronbar=False)

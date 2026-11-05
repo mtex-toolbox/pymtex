@@ -102,7 +102,7 @@ hold(False)
 # +
 # reconstruct grains and smooth only their boundary geometry
 grains = calcGrains(ebsd)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # colour grains by the specimen direction of the crystal c-axis
 cKey = ipfColorKey(grains)

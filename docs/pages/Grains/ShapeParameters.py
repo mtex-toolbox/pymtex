@@ -52,7 +52,7 @@ ebsd = ebsd['indexed']
 
 # reconstruct and smooth the grains
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=5)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 mapGrains = grains
 
 # plot forsterite orientations and the reconstructed boundary network
@@ -122,7 +122,7 @@ largestForsteriteArea
 largestForsteriteFraction = largestForsteriteArea / np.sum(grains.area)
 largestForsteriteFraction
 
-# The largest forsterite section covers 2.805 mm² and accounts for 15.31 percent of the
+# The largest forsterite section covers 2.964 mm² and accounts for 11.93 percent of the
 # analysed interior-grain area. The many small grains have not gone away; area weighting
 # has changed how much each one counts.
 
@@ -143,9 +143,9 @@ len(grains[8].boundary)
 np.sum(grains[8].boundary.segLength)
 
 # The two pairs react differently to processing. `numPixel` remains tied to the
-# measurements, whereas smoothing resamples the outline and can change both
-# `boundarySize` and `perimeter`. By default, `perimeter` measures only the outer loop.
-# The option `withInclusion` adds the loops around grains enclosed inside it.
+# measurements, whereas smoothing moves and merges the boundary segments and can change
+# both `boundarySize` and `perimeter`. By default, `perimeter` measures only the outer
+# loop. The option `withInclusion` adds the loops around grains enclosed inside it.
 
 # ## Diameter and the equivalent circle
 #
@@ -180,7 +180,7 @@ plot(grains, grains.shapeFactor())
 mtexColorbar(title='shape factor')
 # -
 
-# The minimum, median, and maximum are 1.058, 1.221, and 1.662. In the map, the
+# The minimum, median, and maximum are 1.049, 1.202, and 1.678. In the map, the
 # high-value yellow grains are visibly lobed or elongated, while compact grains are dark
 # blue. The measure cannot tell those causes apart: a smooth ellipse and a round grain
 # with a frayed boundary can have the same value.
@@ -229,8 +229,8 @@ sameExtremeWithEdgeGrains
 plot(grains, grains.paris())
 mtexColorbar(title='paris')
 
-# The median `paris` is 2.77 percent, its maximum is 43.30, and its correlation with
-# `shapeFactor` is 0.472. Among the complete grains, both measures select the same extreme
+# The median `paris` is 3.00 percent, its maximum is 45.67, and its correlation with
+# `shapeFactor` is 0.553. Among the complete grains, both measures select the same extreme
 # grain. In the full plotted map, including truncated edge grains, they select different
 # extremes. Their partial agreement is the point: `shapeFactor` counts elongation as a
 # departure from a circle, whereas `paris` does not. The changed selection also shows why
@@ -255,8 +255,8 @@ ebsd = mtexdata('forsterite')
 rawGrains = calcGrains(ebsd)
 rawGrains = rawGrains[~rawGrains.isBoundary]
 
-# use five smoothing iterations for the main estimate
-grains = smoothBoundary(rawGrains, 5)
+# smooth the boundaries for the main estimate
+grains = smoothBoundary(rawGrains)
 
 plt.figure()
 plt.scatter(grains.equivalentRadius, grains.perimeter)
@@ -273,7 +273,7 @@ plt.plot(fitRadius, np.exp(ab[1] + ab[0] * np.log(fitRadius)), linewidth=3)
 # -
 
 # The points scatter around the fitted line because individual grains are not scaled
-# copies of one shape. The fitted slope, 1.011, is the estimated perimeter-area fractal
+# copies of one shape. The fitted slope, 1.009, is the estimated perimeter-area fractal
 # dimension.
 
 fractalDimension = ab[0]
@@ -289,13 +289,12 @@ fractalDimension
 for iter in [0, 5, 25]:
   g = smoothBoundary(rawGrains, iter)
   ab = np.polyfit(np.log(g.equivalentRadius), np.log(g.perimeter), 1)
-  print(f'{iter:2d} smoothing iterations: fractal dimension {ab[0]:.3f}')
+  print(f'{iter:2d} smoothing steps: fractal dimension {ab[0]:.3f}')
 
-# The pixel staircase gives 1.128 because grid corners add artificial length. Five
-# iterations give 1.011, while 25 iterations push the estimate to 0.965, below the range
-# of a self-similar plane curve. That is a diagnostic that the estimator's assumptions
-# have failed, not a physical property of the rock. Compare specimens only after matching
-# the pixel resolution, grain-size cutoff, segmentation, and smoothing procedure.
+# The pixel staircase gives 1.118 because grid corners add artificial length. Five steps
+# give 1.046 and 25 steps 1.002, the value of a smooth curve. The estimate thus measures
+# the smoothing as much as the rock. Compare specimens only after matching the pixel
+# resolution, grain-size cutoff, segmentation, and smoothing procedure.
 
 # ## Further reading
 #

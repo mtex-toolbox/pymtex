@@ -110,7 +110,7 @@ plot(job.grains, bestProbability)
 mtexColorbar(title='best vote probability')
 # -
 
-# In this run, 77.73% of grains with a finite vote have probability above 70%. The map shows
+# In this run, 77.90% of grains with a finite vote have probability above 70%. The map shows
 # where the accepted triple points provide strong seeds and where no unambiguous three-grain
 # constraint is available.
 #
@@ -132,7 +132,7 @@ fractionTransformedByTP
 # -
 
 # Earlier text reported that more than 66% of the input child grains were transformed by these
-# seeds. The current run gives 62.95%, so that claim no longer holds for the present
+# seeds. The current run gives 63.07%, so that claim no longer holds for the present
 # implementation and data import. The remaining child grains need evidence from reconstructed
 # neighbours.
 
@@ -170,7 +170,7 @@ parentColor = ipfKey.orientation2color(job.parentGrains.meanOrientation)
 plot(job.parentGrains, parentColor, figSize='large')
 # -
 
-# The child-grain counts decrease from 1,609 to 1,127 and then 1,097 as the reconstructed
+# The child-grain counts decrease from 1,611 to 1,125 and then 1,097 as the reconstructed
 # neighbourhood expands. The map fills regions that triple-point votes could not seed while
 # retaining the candidates already accepted.
 #
@@ -194,7 +194,7 @@ parentColor = ipfKey.orientation2color(job.parentGrains.meanOrientation)
 plot(job.parentGrains, parentColor, figSize='large')
 # -
 
-# The parent count drops from 45,133 to 144 because similarly oriented fragments now share one
+# The parent count drops from 45,134 to 144 because similarly oriented fragments now share one
 # footprint. Larger, nearly uniform colour regions replace the fragmented candidates in the
 # preceding map.
 #
@@ -220,7 +220,7 @@ parentColor = ipfKey.orientation2color(job.parentGrains.meanOrientation)
 plot(job.parentGrains, parentColor, figSize='large')
 # -
 
-# The parent count drops from 144 to 55 as small inclusions are absorbed. The large parent
+# The parent count drops from 144 to 44 as small inclusions are absorbed. The large parent
 # shapes remain, while tiny enclosed child fragments no longer interrupt them. This is a
 # topological cleanup, not a new variant choice.
 #
@@ -262,7 +262,7 @@ plot(job.grains.boundary, lineWidth=2)
 hold(False)
 # -
 
-# The median fit is 1.189 degrees, 90% are below 2.115 degrees, and 99% are below 3.776
+# The median fit is 1.189 degrees, 90% are below 2.116 degrees, and 99% are below 3.800
 # degrees. Low values indicate pixels consistent with their assigned Burgers variant. The
 # black outlines reveal whether larger mismatches collect near reconstructed boundaries.
 #
@@ -275,7 +275,7 @@ hold(False)
 plot(ebsd['Ti (Alpha)'], ipfDirection=zvector, figSize='large')
 
 hold(True)
-parentGrains = smoothBoundary(job.parentGrains, 5)
+parentGrains = smoothBoundary(job.parentGrains)
 plot(parentGrains.boundary, lineWidth=3, lineColor='white')
 hold(False)
 # -

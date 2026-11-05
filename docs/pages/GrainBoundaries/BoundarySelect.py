@@ -23,7 +23,7 @@ ebsd = ebsd[inpolygon(ebsd, np.array([5, 2, 10, 5]) * 1000)]
 
 # reconstruct and smooth the grains
 grains = calcGrains(ebsd, minPixel=5, alpha=10)
-grains = smoothBoundary(grains, 4)
+grains = smoothBoundary(grains)
 
 # extract and plot the complete boundary list
 gB = grains.boundary
@@ -139,7 +139,7 @@ hold(True)
 plot(grains.innerBoundary, lineColor='red', lineWidth=4)
 hold(False)
 
-# The display reports 11 inner-boundary segments in this barely deformed rock. The red
+# The display reports 6 inner-boundary segments in this barely deformed rock. The red
 # segments sit inside connected grains rather than tracing complete grain outlines.
 # Deformed material may contain many more, and
 # [Subgrain Boundaries](SubGrainBoundaries.html) explains how a two-threshold

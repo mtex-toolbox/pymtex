@@ -43,7 +43,7 @@ ebsd = mtexdata('csl')
 grains = calcGrains(ebsd)
 
 # grain smoothing
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # plot the reconstructed grains by their mean orientations
 plot(grains, ipfDirection=zvector)
@@ -107,7 +107,7 @@ hold(False)
 
 # ## How much of the network is Sigma 3
 #
-# The summary reports 17,569 iron--iron segments. Of these, 7,499, or 42.7 percent, lie
+# The summary reports 8,350 iron--iron segments. Of these, 3,116, or 37.3 percent, lie
 # within 3 degrees of $\Sigma 3$. The gold segments are not scattered randomly: many
 # continue along complete runs from one triple point to the next.
 #
@@ -142,7 +142,7 @@ hold(False)
 
 # ## What the selected triple points mean
 #
-# The map contains 83 such points. Many mark where a twin lamella ends against another
+# The map contains 84 such points. Many mark where a twin lamella ends against another
 # boundary. Their number is one measure of how strongly twinned a material is, although it
 # does not describe network connectivity by itself.
 
@@ -168,7 +168,7 @@ hold(False)
 
 # ## What merging changes
 #
-# The merge reduces 885 reconstructed grains to 415 groups. Many white outlines enclose
+# The merge reduces 885 reconstructed grains to 413 groups. Many white outlines enclose
 # several coloured grains; those regions were one grain before it twinned.
 #
 # Merging records which grains belong together, but it does not identify which child was
@@ -200,10 +200,9 @@ hold(False)
 
 # ## What the other relationships contribute
 #
-# In the order $\Sigma 5$, $\Sigma 7$, $\Sigma 9$, and $\Sigma 11$, the output gives 26,
-# 41, 504, and 187 segments. Thus, $\Sigma 9$ and $\Sigma 11$ account for 2.9 and 1.1
-# percent of the network, while $\Sigma 5$ and $\Sigma 7$ together contribute fewer than 70
-# segments.
+# In the order $\Sigma 5$, $\Sigma 7$, $\Sigma 9$, and $\Sigma 11$, the output gives 19,
+# 19, 283, and 102 segments. Thus, $\Sigma 9$ and $\Sigma 11$ account for 3.4 and 1.2
+# percent of the network, while $\Sigma 5$ and $\Sigma 7$ together contribute 38 segments.
 #
 # These colours occur mainly in short pieces rather than along complete boundaries. The
 # prominence of $\Sigma 9$ is not accidental: when two different $\Sigma 3$ twin variants
@@ -307,7 +306,7 @@ peakAxes
 
 # ## Read the strongest maximum
 #
-# The first maximum is 54.2 multiples of a random distribution (mrd), at 60.0 degrees about
+# The first maximum is 47.9 multiples of a random distribution (mrd), at 60.0 degrees about
 # a member of the $\langle 111 \rangle$ family. It is the $\Sigma 3$ twin relationship.
 
 # ## Count segments near an ideal relationship directly
@@ -323,7 +322,7 @@ sigma9WithinTwoDegrees
 
 # ## Compare the direct segment fractions
 #
-# Within 2 degrees, 40.76 percent of the segments are $\Sigma 3$, compared with 2.07
+# Within 2 degrees, 35.66 percent of the segments are $\Sigma 3$, compared with 2.07
 # percent for $\Sigma 9$. These are segment fractions, not equal votes from neighbouring
 # grain pairs.
 
@@ -350,8 +349,8 @@ plt.ylabel('mrd')
 
 # ## Read the low-index-axis profiles
 #
-# The [111] curve rises to a sharp peak of 54.2 mrd at 60 degrees. The [101] curve stays
-# below 3.4 mrd, and the [100] curve stays below 1 mrd. One misorientation dominates this
+# The [111] curve rises to a sharp peak of 47.9 mrd at 60 degrees. The [101] curve stays
+# below 3.3 mrd, and the [100] curve stays below 1 mrd. One misorientation dominates this
 # material, and it is the twin.
 
 # ## Evaluate the MDF at one misorientation
@@ -369,8 +368,8 @@ sigma3MRD
 
 # ## Compare the two density values
 #
-# The chosen misorientation has density 1.55 mrd, close to the random baseline. The
-# $\Sigma 3$ relationship has density 54.2 mrd, about 54 times the random baseline.
+# The chosen misorientation has density 1.80 mrd, close to the random baseline. The
+# $\Sigma 3$ relationship has density 47.9 mrd, about 48 times the random baseline.
 
 # ## References
 #

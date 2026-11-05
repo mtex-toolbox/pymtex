@@ -35,7 +35,7 @@ grains = calcGrains(ebsd, angle=7.5 * degree, minPixel=5)
 ebsd = ebsd.projectIntoFundamentalRegion()
 
 # smooth only the outlines used in the figures, and keep the indexed grains
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 grains = grains['indexed']
 
 # use one colour key for the measurement and grain-mean maps

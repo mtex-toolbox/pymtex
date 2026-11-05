@@ -33,7 +33,7 @@ ebsd = mtexdata('forsterite')
 # reconstruct grains, discard boundary grains, and smooth their outlines
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=5)
 grains = grains[~grains.isBoundary]
-grains = smoothBoundary(grains['indexed'], 10)
+grains = smoothBoundary(grains['indexed'])
 
 # plot all grains and highlight one complete grain
 plot(grains)
@@ -121,7 +121,7 @@ mtexColorbar(title='(c_max - c_min) / c_max')
 # +
 # load two artificial grains, a rectangle and a turned one
 testgrains = mtexdata('testgrains')
-testgrains = smoothBoundary(testgrains['id', [6, 8]], 10)
+testgrains = smoothBoundary(testgrains['id', [6, 8]])
 
 # compute the longest caliper and the direction normal to the shortest one
 cMax = testgrains.caliper('longest')
@@ -223,7 +223,7 @@ ax.plot(omega, cumplE, linewidth=3, color='k')
 parorMinimum = np.array([np.min(cumplF), np.min(cumplE)])
 parorMinimum
 
-# The forsterite and enstatite minima are 0.7118 and 0.7214, a difference of about 0.01.
+# The forsterite and enstatite minima are 0.7141 and 0.7224, a difference of about 0.01.
 # Both phases therefore have a moderate projection anisotropy of similar strength.
 #
 # The maximum marks the preferred direction of the longest projection. The normal to the
@@ -251,9 +251,9 @@ harmonicDirectionsEn = np.array([np.mod(maxposen, np.pi), np.mod(minposen - np.p
 harmonicDirectionsEn
 # -
 
-# For forsterite the two fitted directions are 71.5 and 74.5 degrees; for enstatite they
-# are 87.5 and 88.8 degrees. The two directions of each phase lie within a few degrees, so
-# both fabrics are close to orthorhombic in this section. The 16-degree difference between
+# For forsterite the two fitted directions are 70.3 and 74.5 degrees; for enstatite they
+# are 87.7 and 88.9 degrees. The two directions of each phase lie within a few degrees, so
+# both fabrics are close to orthorhombic in this section. The 17-degree difference between
 # the preferred longest projections of the two phases is the more interesting comparison.
 #
 # The same directions can be read directly from the sampled values. The sampling is one
@@ -306,12 +306,12 @@ for name, mn, d in zip(pairName, surforMinimum, surforLongDirection):
 # -
 
 # The four curves differ in both shape and direction. The contact between the two
-# pyroxenes, enstatite and diopside, is the roundest, with a minimum at 0.87 of its
+# pyroxenes, enstatite and diopside, is the roundest, with a minimum at 0.88 of its
 # maximum. It is the least anisotropic boundary population in this rock. The most
-# anisotropic is the forsterite-diopside contact at 0.68, not the forsterite-forsterite
-# boundary at 0.76. What sets the forsterite-forsterite boundary apart is its direction
-# rather than its strength: its long direction is 63 degrees, whereas the other three lie
-# between 75 and 85 degrees.
+# anisotropic is the forsterite-diopside contact at 0.70, not the forsterite-forsterite
+# boundary at 0.77. What sets the forsterite-forsterite boundary apart is its direction
+# rather than its strength: its long direction is 61 degrees, whereas the other three lie
+# between 74 and 89 degrees.
 
 # ## Characteristic shape
 #
@@ -349,10 +349,9 @@ characteristicCaliperAngle = np.array([angle(shapeF.caliper('longest'), shapeF.c
                                        angle(shapeEF.caliper('longest'), shapeEF.caliper('shortest'))]).reshape(-1) / degree
 characteristicCaliperAngle
 
-# The two single-phase shapes both give 79.3 degrees. Each is skewed by about 10.7
-# degrees, and the two skews run in opposite senses: the outlines are close to mirror
-# images of one another. The mixed forsterite-enstatite shape is nearly symmetric at 88.5
-# degrees.
+# The two single-phase shapes give 77.7 and 82.3 degrees, skewed from a right angle by
+# about 12.3 and 7.7 degrees. The mixed forsterite-enstatite shape is nearly symmetric at
+# 86.3 degrees.
 #
 # These values describe this map. Whether a difference between specimens is larger than
 # sampling variation requires replicate maps, subdivision, or a justified resampling

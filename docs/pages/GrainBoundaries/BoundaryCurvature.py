@@ -26,8 +26,9 @@ from mtex import *
 # import artificial grain shapes
 grains = mtexdata('testgrains')
 
-# select and smooth the convex, concave, and enclosing shapes inside the background grain
-grains = smoothBoundary(grains['id', list(range(2, 16))], 10)
+# select and smooth the convex, concave, and enclosing shapes inside the background grain;
+# the curvature estimate needs a vertex at every pixel corner, so no simplification
+grains = smoothBoundary(grains['id', list(range(2, 16))], simplify=False)
 # -
 
 # ## Colour a Boundary by Curvature
@@ -89,9 +90,9 @@ turnsBeforeAfterFlip = np.array([np.sum(gB2.curvature() * gB2.segLength),
 turnsBeforeAfterFlip
 # -
 
-# The normalized sums are about -1.02 and 1.02. Reversing the walk changes only the sign.
-# A smooth simple closed curve has a total turning of $\pm 2\pi$; the small offset here
-# comes from the discrete approximation.
+# The normalized sums are about -1.16 and 1.16. Reversing the walk changes only the sign.
+# A smooth simple closed curve has a total turning of $\pm 2\pi$; the offset here comes
+# from the discrete approximation.
 
 # ## Curvature With Respect to a Specific Grain
 #
@@ -177,7 +178,7 @@ plt.ylabel(f'curvature in 1/{gB.scanUnit}')
 # +
 ebsd = mtexdata('titanium')
 grains = calcGrains(ebsd)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains, simplify=False)
 
 # compute the IPF colours explicitly to keep the published output quiet
 indexed = ebsd['indexed']
@@ -213,8 +214,9 @@ mtexColorbar(title=f'grain-relative curvature in 1/{gB.scanUnit}')
 # reveal the surface away from that plane.
 #
 # The result also inherits the spatial resolution and segmentation of the EBSD map.
-# Boundary smoothing suppresses the grid staircase but moves and resamples the trace, so
-# the smoothing choice is part of the measurement rather than a cosmetic plotting choice.
+# Boundary smoothing suppresses the grid staircase but moves the trace and merges its
+# segments, so the smoothing choice is part of the measurement rather than a cosmetic
+# plotting choice.
 
 # ## The Maths Behind the Three-Point Curvature
 #
@@ -258,7 +260,7 @@ mtexColorbar(title=f'grain-relative curvature in 1/{gB.scanUnit}')
 # ## Next
 #
 # Continue with [Grain Boundary Smoothing](GrainSmoothing.html) to choose how the
-# reconstructed pixel staircase is simplified, resampled, and smoothed.
+# reconstructed pixel staircase is smoothed and simplified.
 
 # ## Technical Details
 #
@@ -271,7 +273,7 @@ mtexColorbar(title=f'grain-relative curvature in 1/{gB.scanUnit}')
 # map of fifteen, so the page follows grain 4 where the MATLAB page follows grain 2, and
 # the enclosed grain is 5 inside the ring-shaped 3 rather than 23 and 31; the arc length
 # profile is of grain 13 where MATLAB's is of grain 15. The total turning of grain 4 is
-# ∓1.0244 for MATLAB's ∓1.0199 of grain 2, and two of the first hundred segments are
+# ∓1.1617 for MATLAB's ∓1.01 of grain 2, and two of the first hundred segments are
 # undefined in both. `testgrains.mat` holds one MATLAB grain object, which the port does
 # not read. The enclosed grains 5 and 7 have larger ids than their rings 3 and 2, so the
 # loop draws them last and the red of their own convex boundaries lies over the blue the

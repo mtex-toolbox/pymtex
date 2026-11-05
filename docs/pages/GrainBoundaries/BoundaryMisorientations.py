@@ -42,7 +42,7 @@ minPixel = 10
 grains = calcGrains(ebsd, angle=segAngle, minPixel=minPixel)
 
 # preserve the segment-to-pixel relation needed below
-grains = smoothBoundary(grains, 4, simplify=False)
+grains = smoothBoundary(grains, simplify=False)
 
 # draw the forsterite grains and the complete boundary network
 plot(grains['Fo'], faceColor=[0.75, 0.82, 0.90], micronbar='off', figSize='large')
@@ -147,9 +147,9 @@ print(f'Changes above 30 degrees when angle <= 105: {np.count_nonzero(isLargeSte
       f'of {np.count_nonzero(isLowerAngleStep)}')
 # -
 
-# The median step is about half a degree. Above 105 degrees, roughly one adjacent step in
-# sixteen turns the axis by more than 30 degrees. At or below 105 degrees, about one in a
-# thousand does so. Most abrupt changes in the map therefore lie on the darkest red
+# The median step is about half a degree. Above 105 degrees, 8 of 129 adjacent steps turn
+# the axis by more than 30 degrees, or about one in 16. At or below 105 degrees, only 1 of
+# 983 steps does so. Most abrupt changes in the map therefore lie on the darkest red
 # boundary runs. The printed counts quantify that visual association.
 #
 # The minimum angle remains stable when the minimizing representative changes, but the

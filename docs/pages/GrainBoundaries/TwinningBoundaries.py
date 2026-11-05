@@ -29,7 +29,7 @@ ebsd = mtexdata('twins')
 
 # reconstruct and smooth the grains
 grains = calcGrains(ebsd, angle=5 * degree, minPixel=3)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 # compute the colours explicitly to keep the published output quiet
 colorKey = ipfColorKey(grains)

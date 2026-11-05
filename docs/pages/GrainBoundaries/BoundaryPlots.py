@@ -29,7 +29,7 @@ ebsd = ebsd[inpolygon(ebsd, np.array([5, 2, 10, 5]) * 1000)]
 grains = calcGrains(ebsd, angle=15 * degree, minPixel=5, alpha=10)
 
 # ebsdId is used below, so keep each segment tied to its measured pixel pair
-grains = smoothBoundary(grains, 4, simplify=False)
+grains = smoothBoundary(grains, simplify=False)
 # -
 
 # ## One colour for every boundary
@@ -202,7 +202,7 @@ ebsd = mtexdata('csl')
 
 # reconstruct and smooth the grains
 grains = calcGrains(ebsd)
-grains = smoothBoundary(grains, 2)
+grains = smoothBoundary(grains)
 gB = grains.boundary['iron', 'iron']
 
 # plot image quality beneath a translucent orientation map

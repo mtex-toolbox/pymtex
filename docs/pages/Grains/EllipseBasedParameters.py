@@ -36,7 +36,7 @@ grains = calcGrains(ebsd, angle=5 * degree, minPixel=10)
 # a grain cut off by the edge of the map has no shape of its own
 grains = grains[~grains.isBoundary]
 
-grains = smoothBoundary(grains['indexed'], 10)
+grains = smoothBoundary(grains['indexed'])
 
 # plot the grains
 plot(grains, lineWidth=2)
@@ -180,9 +180,9 @@ longAxisPeakDegree = np.round(np.mod([longAxisPeakF, longAxisPeakE], np.pi) / de
 longAxisPeakDegree
 # -
 
-# The printed maxima are 74.2 degrees for forsterite and 78.8 degrees for enstatite. As
-# far as the long axes show, the two phases share one fabric rather than each having its
-# own.
+# The printed maxima are 71.9 degrees for forsterite and 89.5 degrees for enstatite. Both
+# lie in the same steep sector, so as far as the long axes show, the two phases share one
+# fabric. The enstatite curve rests on fewer grains, and its maximum is less certain.
 
 # ## Shortest-caliper distribution
 #
@@ -215,7 +215,7 @@ caliperPeakDegree = np.round(np.mod([caliperPeakF, caliperPeakE], np.pi) / degre
 caliperPeakDegree
 # -
 
-# The printed maximum is 74.3 degrees for forsterite and 82.0 degrees for enstatite. Two
+# The printed maximum is 74.7 degrees for forsterite and 81.0 degrees for enstatite. Two
 # different definitions of which way a grain points agree on the fabric, which is the
 # reassuring outcome.
 #
@@ -274,12 +274,14 @@ fofoPeakDegree
 gridPeakRelativeHeight = np.round(float(gbfun_fofo(90 * degree)) / fofoPeakDensity, 2)
 gridPeakRelativeHeight
 
-# The forsterite-forsterite curve peaks at 75 degrees, agreeing with the two measures
-# before it. It then stays almost as high all the way to the grid axis at 90 degrees,
-# where its density is still 0.97 of the maximum. The grid contributes to this broad
-# shoulder: before smoothing, every segment between measurement points is horizontal or
-# vertical. Ten smoothing iterations removed most of this artefact, but not all of it.
-# Peaks at exactly 0 and 90 degrees are the features to distrust here.
+# The forsterite-forsterite and forsterite-enstatite curves rise to narrow spikes at
+# exactly 90 and 0 degrees, the grid axes. They come from boundaries that run straight
+# along one row or column of pixels for several steps. Smoothing never moves a boundary
+# across a measured pixel, so it leaves such a run on the axis. A run of $n$ pixels is
+# consistent with any direction within about $1/n$ radians of the axis, so these spikes
+# are the features to distrust. The printed peak of 89.9 degrees is such a spike. Beside
+# the spikes, the forsterite-forsterite curve has its broad maximum between about 60 and
+# 90 degrees, in line with the long axes above.
 
 # ## Characteristic shape
 #
@@ -302,8 +304,8 @@ plt.legend(['Forsterite', 'Enstatite'], loc='center left', bbox_to_anchor=(1.1, 
 # -
 
 # The two outlines are elongated the same way, which is the same conclusion the rose
-# diagrams reached, now expressed as a shape. Their aspect ratios are 1.3289 for
-# forsterite and 1.3394 for enstatite, so the strengths are similar as well.
+# diagrams reached, now expressed as a shape. Their aspect ratios are 1.3262 for
+# forsterite and 1.3358 for enstatite, so the strengths are similar as well.
 
 characteristicAspectRatio = [cshapeF.aspectRatio()[0], cshapeE.aspectRatio()[0]]
 characteristicAspectRatio

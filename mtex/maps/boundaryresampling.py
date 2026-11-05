@@ -134,7 +134,10 @@ def mergeRuns(gB, keep):
   merged = runStart != surv
   eid = out.ebsdId.copy()
   eid[merged] = NO_PIXEL
-  return orderWalk(out._with(F=F, ebsdId=eid, pixelDist=np.where(merged, 0.0, out.pixelDist)))
+  # the merged segments are a network of their own, whose triple points they hold
+  out = out._with(F=F, ebsdId=eid, pixelDist=np.where(merged, 0.0, out.pixelDist))
+  out._root = None
+  return orderWalk(out)
 
 
 def _finish(gB, keep, keepGrains):

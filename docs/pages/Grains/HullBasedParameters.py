@@ -19,7 +19,7 @@ plottingConvention.default('y↑→x')
 grains = mtexdata('testgrains')
 
 # select and smooth a few interesting grains
-grains = smoothBoundary(grains['id', [2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15]], 3)
+grains = smoothBoundary(grains['id', [2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15]])
 # -
 
 # [Boundary smoothing](GrainSmoothing.html) is not optional here. On an unsmoothed square

@@ -117,7 +117,7 @@ plot(ebsdF, ipfDirection=zvector, faceAlpha=alpha, figSize='large')
 
 # +
 grains = calcGrains(ebsd, angle=10 * degree)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 
 plot(ebsd, ebsd.bc)
 mtexColorMap('black2white')

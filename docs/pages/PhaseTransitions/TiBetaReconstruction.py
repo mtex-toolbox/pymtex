@@ -232,7 +232,7 @@ hold(False)
 # -
 
 # Low values indicate pixels consistent with the assigned Burgers variant. The median is 1.19
-# degrees, 90% are below 2.10 degrees, and 99% are below 3.58 degrees.
+# degrees, 90% are below 2.11 degrees, and 99% are below 3.67 degrees.
 #
 # The black outlines show whether larger mismatches collect at reconstructed parent
 # boundaries rather than filling a grain interior.
@@ -246,7 +246,7 @@ hold(False)
 plot(ebsd['Ti (Alpha)'], ipfDirection=zvector, figSize='large')
 
 hold(True)
-parentGrains = smoothBoundary(job.parentGrains, 5)
+parentGrains = smoothBoundary(job.parentGrains)
 plot(parentGrains.boundary, lineWidth=3, lineColor='White')
 hold(False)
 # -

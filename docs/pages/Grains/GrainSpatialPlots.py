@@ -99,7 +99,7 @@ plot(grains, grains.aspectRatio())
 mtexColorbar(title='aspect ratio')
 
 # Almost the whole map sits at the bottom of the colour range because a few ribbon-shaped
-# grains reach an aspect ratio of 13 and stretch it. Fixing the range to the interval of
+# grains reach an aspect ratio of 18 and stretch it. Fixing the range to the interval of
 # interest makes the other grains visible.
 
 # +
@@ -112,7 +112,7 @@ maxAspectRatio
 numClipped = np.count_nonzero(grains.aspectRatio() > 5)
 numClipped
 
-# The printed maximum rounds to 13, and the count confirms that eight grains lie above the
+# The printed maximum rounds to 18, and the count confirms that nine grains lie above the
 # chosen range. They are no longer distinguishable from one another, so every fixed colour
 # range trades detail in the extremes for contrast through the rest.
 #
@@ -244,7 +244,7 @@ maxDeparture = max(angle(grains[id].meanOrientation, ebsdMaxGrain['indexed'].ori
 maxDeparture
 # -
 
-# Most of the 3193 measurements in the displayed summary have the same shade of blue. The
+# Most of the 3199 measurements in the displayed summary have the same shade of blue. The
 # narrow neck on the left is visibly lighter: its lattice is bent, and the printed maximum
 # departure from the grain mean is 6 degrees.
 # [Orientation Parameters](GrainOrientationParameters.html) measures this variation rather
@@ -268,7 +268,7 @@ plottingConvention.default('y↓→x')
 ebsd = mtexdata('csl')
 
 grains = calcGrains(ebsd, minPixel=5)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 plot(grains, ipfDirection=zvector, micronbar=False, region=[50, 300, 100, 250])
 
 # where one representative of the [100] family points in each grain

@@ -45,7 +45,7 @@ grains = calcGrains(ebsd, angle=10 * degree, minPixel=3)
 # `simplify=False` preserves that relation while smoothing.
 
 # +
-grains = grains.smoothBoundary(5, simplify=False)
+grains = grains.smoothBoundary(simplify=False)
 
 # draw the grains and overlay the complete boundary network
 plot(grains, faceColor=[0.9, 0.9, 0.9], micronbar='off')
@@ -191,7 +191,7 @@ mtexColorbar(title='axis-to-mean-trace angle (°)')
 
 # The flicker is suppressed, so nearby segments on one boundary now carry similar colours.
 # The values differ from boundary to boundary, which is the information the flicker was
-# hiding. The median angle is 43.2 degrees, and 10.5 percent of the segments lie below 20
+# hiding. The median angle is 43.3 degrees, and 10.9 percent of the segments lie below 20
 # degrees. The misorientation axes are therefore mostly not aligned with the traces in
 # this section.
 
@@ -274,7 +274,7 @@ mtexColorbar(title='segments per component')
 numTwinComponents = np.max(gBTwin.componentId)
 print(f'twin segments {len(gBTwin)}, components {numTwinComponents}')
 
-# The 1648 selected segments form 54 components. A twin lamella crossing a grain is one
+# The 1653 selected segments form 54 components. A twin lamella crossing a grain is one
 # long component. A few isolated segments that happen to meet the twin criterion form a
 # short component, which is why component labels are useful.
 
@@ -308,10 +308,10 @@ mtexColorbar(title='component straightness')
 # -
 
 # Straight components are red, while meandering or branched components are blue. The
-# values reach 0.97 and have a median of 0.66.
+# values reach 0.97 and have a median of 0.65.
 #
 # Define a large component here as one containing more than 50 segments. The 13 large
-# components have a median of 0.48, compared with 0.67 for the rest. A large component in
+# components have a median of 0.47, compared with 0.68 for the rest. A large component in
 # this map is often several lamellae meeting inside one grain, rather than one long
 # straight lamella.
 

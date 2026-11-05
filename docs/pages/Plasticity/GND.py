@@ -28,7 +28,7 @@ plottingConvention.default('y←↑x')
 ebsd = mtexdata('dc06')
 
 grains = calcGrains(ebsd, angle=2.5 * degree, minPixel=6)
-grains = smoothBoundary(grains, 5)
+grains = smoothBoundary(grains)
 # -
 
 # An inverse pole figure (IPF) key colors each indexed orientation by the

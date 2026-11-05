@@ -39,9 +39,9 @@ grains
 # threshold is an example parameter, not a universal grain definition.
 # [Grain Reconstruction](GrainReconstruction.html) explains how to choose and report it.
 #
-# [smoothBoundary](grain2d.smoothBoundary.html) simplifies, refines, and smooths the pixel
-# staircase by default. This improves trace geometry but changes the number and length of
-# segments. [Grain Smoothing](GrainSmoothing.html) develops that choice.
+# [smoothBoundary](grain2d.smoothBoundary.html) smooths the pixel staircase and then merges
+# the straightened segments. This improves trace geometry but changes the number and length
+# of segments. [Grain Smoothing](GrainSmoothing.html) develops that choice.
 
 # +
 # create one explicit inverse pole figure colour key
@@ -68,8 +68,8 @@ gB
 
 # ## Reading the boundary summary
 #
-# The summary reports 3359 segments after smoothing. Of these, 2751 lie between two
-# magnesium grains and 608 form the outer rim, which appears in the `notIndexed` row
+# The summary reports 1420 segments after smoothing. Of these, 1378 lie between two
+# magnesium grains and 42 form the outer rim, which appears in the `notIndexed` row
 # because there is no grain on its other side.
 #
 # In a general map the same row can also contain boundaries next to `notIndexed`
@@ -110,7 +110,7 @@ mtexColorbar(title='minimum misorientation angle (degree)')
 # ## Measure the dominant angle population
 #
 # The next two displayed values summarize segments, not whole physical interfaces. The
-# median angle is 84.7 degrees, and 58 percent of the segments have angles above 80
+# median angle is 85.6 degrees, and 64 percent of the segments have angles above 80
 # degrees.
 
 medianAngle = np.median(misorientationAngle)
@@ -196,7 +196,9 @@ plt.title('Magnesium to magnesium boundaries')
 
 # ## Technical Details
 #
-# `smoothBoundary` leaves 3363 segments for MATLAB's 3359 (2755 for 2751 between two
-# magnesium grains), so the median angle is 84.55 degrees for MATLAB's 84.68 and the
-# fraction above 80 degrees 0.5819 for 0.5816; the peak bin, 86 to 88 degrees, agrees. The
+# `smoothBoundary` leaves 1420 segments where MATLAB's page quotes 3359 (1378 for 2751
+# between two magnesium grains), the median angle is 85.58 degrees for its 84.7 and the
+# fraction above 80 degrees 0.6422 for its 0.58; the peak bin, 86 to 88 degrees, agrees.
+# MATLAB's page keeps the numbers of its earlier smoothing, which simplified and resampled
+# the staircase and kept more segments. The
 # trace length per bin is one `np.histogram` with `weights=segLength`.
