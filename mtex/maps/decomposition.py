@@ -625,8 +625,13 @@ def splitPinches(c):
   the face between them, elsewhere the outside passes between them"""
   px = c.sites.pixel[c.cells]
   nC = (px >= 0).sum(axis=1)
-  nV = len(c.V)
-  isP = (np.bincount(c.F[nC > 0].reshape(-1), minlength=nV) == 4) & (np.bincount(c.F[nC == 1].reshape(-1), minlength=nV) == 4)
+  # the vertices of four faces against the outside, then those of no other face of a cell
+  cand = np.flatnonzero(np.bincount(c.F[nC == 1].reshape(-1), minlength=len(c.V)) == 4)
+  if len(cand) == 0:
+    return c
+  near = np.isin(c.F, cand).any(axis=1) & (nC > 0)
+  isP = np.zeros(len(c.V), dtype=bool)
+  isP[cand] = np.bincount(c.F[near].reshape(-1), minlength=len(c.V))[cand] == 4
   if not isP.any():
     return c
   V, F, cells = c.V.copy(), c.F.copy(), c.cells.copy()

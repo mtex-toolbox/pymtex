@@ -26,11 +26,8 @@ def straightenInFill(c, seg):
   inFill, tol, dxy, grainId = c.inFill, c.dxy / 100, c.dxy, seg.grainId
   if inFill is None:
     return c, seg
-  V, F, cells = c.V.astype(float), c.F, c.cells
-  px = c.sites.pixel[cells]
-  g = np.where(px >= 0, grainId[np.maximum(px, 0)], 0)
-  nC = (px >= 0).sum(axis=1)
-  isB = (nC == 1) | ((nC == 2) & (g[:, 0] != g[:, 1]))
+  # the boundary: the faces between two grains or against the outside, the segmentation's outer ones
+  V, F, cells, isB = c.V.astype(float), c.F, c.cells, seg.isOuter.copy()
 
   # a boundary segment entering the filled cells gets a vertex there, by bisection
   dE = inFill(V[F[isB]].reshape(-1, 2)).reshape(-1, 2)

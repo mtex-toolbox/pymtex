@@ -137,10 +137,22 @@ def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, r
   s = c.sites
   args = (todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
           int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, segStart, seg,
-          1e-9 * c.dxy, out)
-  # all pixels in one compiled loop, its Python form below as fallback
+          1e-9 * c.dxy)
+  # all pixels in one compiled loop, which tests only the pixels near a boundary against the
+  # polygons; its Python form below as fallback
   loop = pixelKernel("absorb", backend)
-  (loop or _absorbPython)(*args)
+  if loop is None:
+    _absorbPython(*args, out)
+    return out
+  # the cells a boundary segment touches, in lattice indices of the ideal lattice; a scale per unit
+  # length that bounds the index distance, widened by how far a pixel lies from its lattice point
+  Minv = np.linalg.inv(np.asarray(l.A, dtype=float).T)
+  p0 = np.asarray(l.origin, dtype=float)
+  scale = float(np.linalg.norm(Minv))
+  dev = float(np.abs((P - p0) @ Minv - l.ij).max(initial=0))
+  mark = np.zeros(s.lookup.shape, dtype=bool)
+  pixelKernel("mark", backend)(seg, p0, Minv, int(s.offset[0]), int(s.offset[1]), mark)
+  loop(*args, mark, scale, float(np.linalg.norm(corners, axis=1).max()) + dev / max(scale, 1e-300), out)
   return out
 
 
