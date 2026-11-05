@@ -1458,15 +1458,22 @@ def _fillLoop(P, p0, Minv, M, fill, lo0, lo1, out):
 
 
 # whether the area segment s of em sweeps from V0 to V leaves the fill by more than tol, sampled
-# on the (T + 1) x (K + 1) grid of straightenInFill
-def _sweepLoop(em, V0, V, T, K, p0, Minv, M, fill, lo0, lo1, tol, out):
+# on the (T + 1) x (K + 1) grid of straightenInFill: T and K a third of a pixel dxy apart along
+# and across, from the longer of the two segments and the longer move of its ends
+def _sweepLoop(em, V0, V, dxy, p0, Minv, M, fill, lo0, lo1, tol, out):
   for s in prange(em.shape[0]):
     a, b = em[s, 0], em[s, 1]
+    L0 = np.sqrt((V0[b, 0] - V0[a, 0]) * (V0[b, 0] - V0[a, 0]) + (V0[b, 1] - V0[a, 1]) * (V0[b, 1] - V0[a, 1]))
+    L1 = np.sqrt((V[b, 0] - V[a, 0]) * (V[b, 0] - V[a, 0]) + (V[b, 1] - V[a, 1]) * (V[b, 1] - V[a, 1]))
+    da = np.sqrt((V[a, 0] - V0[a, 0]) * (V[a, 0] - V0[a, 0]) + (V[a, 1] - V0[a, 1]) * (V[a, 1] - V0[a, 1]))
+    db = np.sqrt((V[b, 0] - V0[b, 0]) * (V[b, 0] - V0[b, 0]) + (V[b, 1] - V0[b, 1]) * (V[b, 1] - V0[b, 1]))
+    T = max(1, int(np.ceil(3 * max(L0, L1) / dxy)))
+    K = max(1, int(np.ceil(3 * max(da, db) / dxy)))
     hit = False
-    for li in range(K[s] + 1):
-      l = li / K[s]
-      for ti in range(T[s] + 1):
-        t = ti / T[s]
+    for li in range(K + 1):
+      l = li / K
+      for ti in range(T + 1):
+        t = ti / T
         x = (1 - l) * ((1 - t) * V0[a, 0] + t * V0[b, 0]) + l * ((1 - t) * V[a, 0] + t * V[b, 0])
         y = (1 - l) * ((1 - t) * V0[a, 1] + t * V0[b, 1]) + l * ((1 - t) * V[a, 1] + t * V[b, 1])
         if _fillAt(x, y, p0, Minv, M, fill, lo0, lo1) < -tol:
@@ -1478,8 +1485,14 @@ def _sweepLoop(em, V0, V, T, K, p0, Minv, M, fill, lo0, lo1, tol, out):
 
 
 # the segments (a, b) listed in every cell of the grid of spacing h from (x0, y0) their bounding
-# box meets: the cells' starts into the list, and the list
-def _segmentGrid(a, b, x0, y0, h, nx, ny):
+# box meets, of the cells the boxes of the segments sel meet: the cells' starts into the list,
+# and the list
+def _segmentGrid(a, b, sel, x0, y0, h, nx, ny):
+  near = np.zeros(nx * ny, np.bool_)
+  for s in sel:
+    for i in range(int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h) + 1):
+      for j in range(int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h) + 1):
+        near[i * ny + j] = True
   start = np.zeros(nx * ny + 1, np.int64)
   items = np.empty(0, np.int64)
   for p in range(2):
@@ -1489,6 +1502,8 @@ def _segmentGrid(a, b, x0, y0, h, nx, ny):
       for i in range(i0, i1 + 1):
         for j in range(j0, j1 + 1):
           c = i * ny + j
+          if not near[c]:
+            continue
           if p == 0:
             start[c + 1] += 1
           else:
@@ -1504,17 +1519,17 @@ def _segmentGrid(a, b, x0, y0, h, nx, ny):
   return start, items
 
 
-def segmentGridNumba(a, b, h):
-  """the segments (a, b) listed in every cell of a grid of spacing h their bounding box meets: the
-  origin, the number of cells along y, the cells' starts into the list and the list; None without
-  numba"""
+def segmentGridNumba(a, b, sel, h):
+  """the segments (a, b) listed in every cell of a grid of spacing h their bounding box meets, of
+  the cells the boxes of the segments sel meet: the origin, the number of cells along y, the
+  cells' starts into the list and the list; None without numba"""
   if not _useNumba():
     return None
   _preparePixel()
   x0, y0 = min(a[:, 0].min(), b[:, 0].min()), min(a[:, 1].min(), b[:, 1].min())
   nx = int((max(a[:, 0].max(), b[:, 0].max()) - x0) / h) + 1
   ny = int((max(a[:, 1].max(), b[:, 1].max()) - y0) / h) + 1
-  start, items = _segmentGrid(a, b, x0, y0, h, nx, ny)
+  start, items = _segmentGrid(a, b, sel, x0, y0, h, nx, ny)
   return x0, y0, ny, start, items
 
 

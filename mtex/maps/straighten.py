@@ -69,13 +69,8 @@ def straightenInFill(c, seg):
 
     # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
     isM = np.any(W != Wlast, axis=1)[e].any(axis=1)
-    em = e[isM]
-    dV = np.linalg.norm(W - W0, axis=1)
-    T = np.maximum(1, np.ceil(3 * np.maximum(np.linalg.norm(W0[em[:, 1]] - W0[em[:, 0]], axis=1),
-                                             np.linalg.norm(W[em[:, 1]] - W[em[:, 0]], axis=1)) / dxy)).astype(np.int64)
-    K = np.maximum(1, np.ceil(3 * dV[em].max(axis=1, initial=0) / dxy)).astype(np.int64)
     bad = crossing(W, e, isM, dxy)
-    bad[isM] |= sweepsOut(W0, W, em, T, K, inFill, tol)
+    bad[isM] |= sweepsOut(W0, W, e[isM], dxy, inFill, tol)
     if not bad.any():
       break
     isFixed[e[bad].reshape(-1)] = True
@@ -87,15 +82,18 @@ def straightenInFill(c, seg):
           segmentation(grainId, seg.nGrains, seg.connect[ix], seg.isInner[ix], seg.isOuter[ix]))
 
 
-def sweepsOut(V0, V, em, T, K, inFill, tol):
+def sweepsOut(V0, V, em, dxy, inFill, tol):
   """whether the area each segment em sweeps from V0 to V leaves the fill by more than tol, at
-  (T + 1) x (K + 1) samples along and across it; compiled on a rigid lattice, sampled in NumPy
-  otherwise and as the oracle"""
+  samples a third of a pixel apart along and across it; compiled on a rigid lattice, sampled in
+  NumPy otherwise and as the oracle"""
   out = np.zeros(len(em), dtype=bool)
   loop = pixelKernel("sweep") if inFill.rigid else None
   if loop is not None:
-    loop(np.ascontiguousarray(em), np.ascontiguousarray(V0), np.ascontiguousarray(V), T, K, *inFill.lattice, tol, out)
+    loop(np.ascontiguousarray(em), np.ascontiguousarray(V0), np.ascontiguousarray(V), dxy, *inFill.lattice, tol, out)
     return out
+  T = np.maximum(1, np.ceil(3 * np.maximum(np.linalg.norm(V0[em[:, 1]] - V0[em[:, 0]], axis=1),
+                                           np.linalg.norm(V[em[:, 1]] - V[em[:, 0]], axis=1)) / dxy)).astype(np.int64)
+  K = np.maximum(1, np.ceil(3 * np.linalg.norm(V - V0, axis=1)[em].max(axis=1, initial=0) / dxy)).astype(np.int64)
   n = (T + 1) * (K + 1)
   sid = np.repeat(np.arange(len(em)), n)
   r = np.arange(len(sid)) - np.repeat(np.cumsum(n) - n, n)
@@ -114,7 +112,7 @@ def crossing(V, e, isM, h):
   if len(q) == 0:
     return isX
   a, b = np.ascontiguousarray(V[e[:, 0]]), np.ascontiguousarray(V[e[:, 1]])
-  grid = segmentGridNumba(a, b, h)
+  grid = segmentGridNumba(a, b, q, h)
   if grid is not None:
     pixelKernel("crossing")(a, b, np.ascontiguousarray(e, dtype=np.int64), q, grid[0], grid[1], h, *grid[2:], isX)
     return isX
