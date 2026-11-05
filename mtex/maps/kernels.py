@@ -1432,7 +1432,8 @@ def laplaceStepsNumba(V, L, free, rates, cells=None, backend=None):
 # where the point (x, y) lies to the filled cells of the rigid lattice p0 + (i, j) M, Minv its
 # inverse: the distance to the nearest other of the four lattice points around it minus the one
 # to the nearest filled, +-inf where all four are of one kind, 0 where the two tie to rounding;
-# decomposition.fillDistance is the NumPy form
+# the two nearest found on the squared distances, the roots taken of them alone (a root is
+# monotone, so the nearest is the same); decomposition.fillDistance is the NumPy form
 def _fillAt(x, y, p0, Minv, M, fill, lo0, lo1):
   ux, uy = x - p0[0], y - p0[1]
   ci = np.floor(ux * Minv[0, 0] + uy * Minv[1, 0])
@@ -1441,12 +1442,13 @@ def _fillAt(x, y, p0, Minv, M, fill, lo0, lo1):
   for k in range(4):
     I, J = ci + (k & 1), cj + (k >> 1)
     dx, dy = ux - (I * M[0, 0] + J * M[1, 0]), uy - (I * M[0, 1] + J * M[1, 1])
-    d = np.sqrt(dx * dx + dy * dy)
+    d = dx * dx + dy * dy
     a, b = int(I) - lo0, int(J) - lo1
     if 0 <= a < fill.shape[0] and 0 <= b < fill.shape[1] and fill[a, b]:
       dF = min(dF, d)
     else:
       dO = min(dO, d)
+  dF, dO = np.sqrt(dF), np.sqrt(dO)
   d = dO - dF
   return 0.0 if abs(d) <= 1e-12 * (dO + dF) and np.isfinite(d) else d
 
@@ -1459,7 +1461,9 @@ def _fillLoop(P, p0, Minv, M, fill, lo0, lo1, out):
 
 # whether the area segment s of em sweeps from V0 to V leaves the fill by more than tol, sampled
 # on the (T + 1) x (K + 1) grid of straightenInFill: T and K a third of a pixel dxy apart along
-# and across, from the longer of the two segments and the longer move of its ends
+# and across, from the longer of the two segments and the longer move of its ends; the new
+# segment first, where a sweep leaves the fill most often, and a segment whose ends stayed
+# sampled once, as its old and new positions coincide
 def _sweepLoop(em, V0, V, dxy, p0, Minv, M, fill, lo0, lo1, tol, out):
   for s in prange(em.shape[0]):
     a, b = em[s, 0], em[s, 1]
@@ -1470,7 +1474,7 @@ def _sweepLoop(em, V0, V, dxy, p0, Minv, M, fill, lo0, lo1, tol, out):
     T = max(1, int(np.ceil(3 * max(L0, L1) / dxy)))
     K = max(1, int(np.ceil(3 * max(da, db) / dxy)))
     hit = False
-    for li in range(K + 1):
+    for li in range(K, -1 if da > 0 or db > 0 else K - 1, -1):
       l = li / K
       for ti in range(T + 1):
         t = ti / T
@@ -1484,35 +1488,21 @@ def _sweepLoop(em, V0, V, dxy, p0, Minv, M, fill, lo0, lo1, tol, out):
     out[s] = hit
 
 
-# the segments (a, b) listed in every cell of the grid of spacing h from (x0, y0) their bounding
-# box meets, of the cells the boxes of the segments sel meet: the cells' starts into the list,
-# and the list
-def _segmentGrid(a, b, sel, x0, y0, h, nx, ny):
+# the segments idx of e, from W[e[., 0]] to W[e[., 1]], listed in every cell of the grid of
+# spacing h from (x0, y0) their bounding box meets, of the cells the boxes of the segments sel
+# meet: the cells' starts into the list, and the list
+def _segmentGrid(W, e, idx, sel, x0, y0, h, nx, ny):
   near = np.zeros(nx * ny, np.bool_)
-  if sel.shape[0] == a.shape[0]:
-    near[:] = True
-    sel = sel[:0]
   for s in sel:
-    for i in range(int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h) + 1):
-      for j in range(int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h) + 1):
+    for i in range(int((min(W[e[s, 0], 0], W[e[s, 1], 0]) - x0) / h), int((max(W[e[s, 0], 0], W[e[s, 1], 0]) - x0) / h) + 1):
+      for j in range(int((min(W[e[s, 0], 1], W[e[s, 1], 1]) - y0) / h), int((max(W[e[s, 0], 1], W[e[s, 1], 1]) - y0) / h) + 1):
         near[i * ny + j] = True
-  # the segments whose box meets one of those cells
-  cand = np.empty(a.shape[0], np.int64)
-  n = 0
-  for s in range(a.shape[0]):
-    hit = False
-    for i in range(int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h) + 1):
-      for j in range(int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h) + 1):
-        hit = hit or near[i * ny + j]
-    if hit:
-      cand[n] = s
-      n += 1
   start = np.zeros(nx * ny + 1, np.int64)
   items = np.empty(0, np.int64)
   for p in range(2):
-    for s in cand[:n]:
-      i0, i1 = int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h)
-      j0, j1 = int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h)
+    for s in idx:
+      i0, i1 = int((min(W[e[s, 0], 0], W[e[s, 1], 0]) - x0) / h), int((max(W[e[s, 0], 0], W[e[s, 1], 0]) - x0) / h)
+      j0, j1 = int((min(W[e[s, 0], 1], W[e[s, 1], 1]) - y0) / h), int((max(W[e[s, 0], 1], W[e[s, 1], 1]) - y0) / h)
       for i in range(i0, i1 + 1):
         for j in range(j0, j1 + 1):
           c = i * ny + j
@@ -1533,18 +1523,14 @@ def _segmentGrid(a, b, sel, x0, y0, h, nx, ny):
   return start, items
 
 
-def segmentGridNumba(a, b, sel, h):
-  """the segments (a, b) listed in every cell of a grid of spacing h their bounding box meets, of
-  the cells the boxes of the segments sel meet: the origin, the number of cells along y, the
+def segmentGridNumba(W, e, idx, sel, x0, y0, h, nx, ny):
+  """the segments idx of e over the vertices W listed in every cell of the nx x ny grid of spacing
+  h from (x0, y0) their bounding box meets, of the cells the boxes of the segments sel meet: the
   cells' starts into the list and the list; None without numba"""
   if not _useNumba():
     return None
   _preparePixel()
-  x0, y0 = min(a[:, 0].min(), b[:, 0].min()), min(a[:, 1].min(), b[:, 1].min())
-  nx = int((max(a[:, 0].max(), b[:, 0].max()) - x0) / h) + 1
-  ny = int((max(a[:, 1].max(), b[:, 1].max()) - y0) / h) + 1
-  start, items = _segmentGrid(a, b, sel, x0, y0, h, nx, ny)
-  return x0, y0, ny, start, items
+  return _segmentGrid(W, e, np.ascontiguousarray(idx, dtype=np.int64), np.ascontiguousarray(sel, dtype=np.int64), x0, y0, h, nx, ny)
 
 
 # whether segment s, from W[e[s, 0]] to W[e[s, 1]], properly crosses one of the segments listed in
@@ -1572,12 +1558,18 @@ def _gridCross(W, e, s, x0, y0, h, ny, start, items):
   return False
 
 
-# whether each segment q crosses another one, the candidates the segments of the first grid,
-# listed where they were when it was built, and those of the second, the segments moved since
-def _crossingLoop(W, e, q, x0, y0, h, ny, start, items, x1, y1, ny1, start1, items1, out):
+# whether each segment q crosses another one, the candidates the segments listed in the grids
+# starts[g], items[ioff[g]:ioff[g + 1]] of one geometry: the first of every segment where it was
+# when it was built, the others of the segments moved in a round, where they were then
+def _crossingLoop(W, e, q, x0, y0, h, ny, starts, items, ioff, out):
   for k in prange(q.shape[0]):
     s = q[k]
-    out[s] = _gridCross(W, e, s, x0, y0, h, ny, start, items) or _gridCross(W, e, s, x1, y1, h, ny1, start1, items1)
+    hit = False
+    for g in range(starts.shape[0]):
+      if _gridCross(W, e, s, x0, y0, h, ny, starts[g], items[ioff[g]:ioff[g + 1]]):
+        hit = True
+        break
+    out[s] = hit
 
 
 _PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_gridCross", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",

@@ -30,13 +30,14 @@ def straightenInFill(c, seg):
   V, F, cells, isB = c.V.astype(float), c.F, c.cells, seg.isOuter.copy()
 
   # the fill test at every boundary vertex once
+  FB = F[isB]
   used = np.zeros(len(V), dtype=bool)
-  used[F[isB]] = True
+  used[FB] = True
   dV = np.full(len(V), np.nan)
   dV[used] = inFill(V[used])
   # a boundary segment entering the filled cells gets a vertex there, by bisection
-  dE = dV[F[isB]]
-  cut = np.flatnonzero(isB)[(dE.max(axis=1) > tol) & (dE.min(axis=1) < -tol)]
+  d0, d1 = dV[FB[:, 0]], dV[FB[:, 1]]
+  cut = np.flatnonzero(isB)[(np.maximum(d0, d1) > tol) & (np.minimum(d0, d1) < -tol)]
   a, b = V[F[cut, 0]], V[F[cut, 1]]
   lo, hi = np.zeros((len(cut), 1)), np.ones((len(cut), 1))
   aIn = dV[F[cut, 0]] > 0
@@ -56,7 +57,7 @@ def straightenInFill(c, seg):
   # the boundary vertices alone, numbered from 0 in e in the order of V
   used = np.concatenate([used, np.ones(len(cut), dtype=bool)])
   vB = np.flatnonzero(used)
-  e = (np.cumsum(used) - 1)[F[isB]].astype(np.int64)
+  e = (np.cumsum(used, dtype=np.int64) - 1)[F[isB]]
   from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
@@ -66,15 +67,17 @@ def straightenInFill(c, seg):
   hseg = adjacencyNumba(e, ptr)
   if hseg is None:
     hseg = np.repeat(np.arange(m), 2)[np.argsort(e.reshape(-1), kind="stable")]
-  nbr = e[hseg].sum(axis=1) - np.repeat(np.arange(nB), np.diff(ptr))
   deg = np.diff(ptr)
+  nbr = (e[:, 0] + e[:, 1])[hseg] - np.repeat(np.arange(nB), deg)
   W0 = V[vB]
   isFixed = dV[vB] <= tol
   # every round solves only the chains a vertex held in the last one belongs to, and samples and
   # tests the segments that moved
-  W, mi, reset, lab, loc, grid, since = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), None, None
+  W, mi, reset, lab, loc, grids = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), []
+  # the solve keeps every vertex in the hull of the held ones, so the box of W0 holds every round
+  box = W0.T.min(axis=1), W0.T.max(axis=1)
   while True:
-    moved = [reset[np.any(W[reset] != W0[reset], axis=1)]]
+    moved = [reset[(W[reset, 0] != W0[reset, 0]) | (W[reset, 1] != W0[reset, 1])]]
     W[reset] = W0[reset]
     if len(mi):
       # (D + 1e-3) W - A W = A W0 over the held neighbours + 1e-3 W0, the free vertices in their order
@@ -90,28 +93,34 @@ def straightenInFill(c, seg):
       r, col = key // nB, key % nB
       rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
       Wm = spsolve(M, rhs).reshape(-1, 2)
-      moved.append(mi[np.any(Wm != W[mi], axis=1)])
+      moved.append(mi[(Wm[:, 0] != W[mi, 0]) | (Wm[:, 1] != W[mi, 1])])
       W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
     moved = np.concatenate(moved)
     isM = np.zeros(m, dtype=bool)
     isM[hseg[_ranges(ptr, moved)]] = True
-    if grid is not None:
-      since = isM if since is None else since | isM
-    bad, grid = crossing(W, e, isM, 4 * dxy, grid, None if since is None else np.flatnonzero(since))
-    # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
-    bad[isM] |= sweepsOut(W0, W, e[isM], dxy, inFill, tol)
+    # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last
+    # round, and the crossings of those that stay in the fill
+    q = np.flatnonzero(isM)
+    bad = np.zeros(m, dtype=bool)
+    bad[q] = sweepsOut(W0, W, e[q], dxy, inFill, tol)
+    isX, grids = crossing(W, e, q[~bad[q]], 4 * dxy, box, grids, q)
+    bad |= isX
     if not bad.any():
       break
     v = e[bad].reshape(-1)
-    reset = np.unique(v[~isFixed[v]])
+    held = np.zeros(nB, dtype=bool)
+    held[v[~isFixed[v]]] = True
+    reset = np.flatnonzero(held)
     isFixed[v] = True
-    mi = np.flatnonzero(np.isin(lab, lab[v]) & ~isFixed)
+    hit = np.zeros(lab.max() + 2, dtype=bool)
+    hit[lab[v] + 1] = True
+    mi = np.flatnonzero(hit[lab + 1] & ~isFixed)
   V0, V = V, V.copy()
   V[vB] = W
-  ix = np.concatenate([np.arange(len(c.F)), cut])
-  return (cellComplex(V.astype(c.V.dtype), F.astype(c.F.dtype), cells, c.sites, c.A, c.plane, c.shape, V0.astype(c.V.dtype)),
-          segmentation(grainId, seg.nGrains, seg.connect[ix], seg.isInner[ix], seg.isOuter[ix]))
+  split = lambda x: np.concatenate([x, x[cut]])
+  return (cellComplex(V.astype(c.V.dtype, copy=False), F.astype(c.F.dtype, copy=False), cells, c.sites, c.A, c.plane, c.shape, V0.astype(c.V.dtype, copy=False)),
+          segmentation(grainId, seg.nGrains, split(seg.connect), split(seg.isInner), split(seg.isOuter)))
 
 
 def sweepsOut(V0, V, em, dxy, inFill, tol):
@@ -141,29 +150,26 @@ def _ranges(ptr, v):
   return np.repeat(ptr[v] - np.cumsum(n) + n, n) + np.arange(n.sum())
 
 
-def crossing(V, e, isM, h, grid=None, since=None):
-  """the segments of e with isM that cross another one of e properly, without a common vertex,
-  and the grid of spacing h the compiled test lists the segments in: the one given, built where
-  the segments were, with those moved since, the segments since, in a second one, or a new one.
-  Without numba the pairs whose midpoints lie in neighbouring cells of a grid as large as the
-  longest segment"""
+def crossing(V, e, q, h, box, grids=(), moved=None):
+  """the segments q of e that cross another one of e properly, without a common vertex, and the
+  grids of spacing h over box the compiled test lists the segments in: the ones given, the first
+  of every segment where it was when it was built, the others of the segments moved in a round,
+  where they were then, and one more of the segments moved now, each over the cells the segments
+  q meet. Without numba the pairs whose midpoints lie in neighbouring cells of a grid as large as
+  the longest segment"""
   isX = np.zeros(len(e), dtype=bool)
-  q = np.flatnonzero(isM)
-  ends = lambda k: (np.ascontiguousarray(V[e[k, 0]]), np.ascontiguousarray(V[e[k, 1]]))
   loop = pixelKernel("crossing")
   if loop is not None:
-    if grid is None:
-      grid = segmentGridNumba(*ends(slice(None)), np.arange(len(e)), h)
-    two = (grid[0], grid[1], 1, np.zeros(2, dtype=np.int64), np.zeros(0, dtype=np.int64))
-    if since is not None and len(since):
-      x1, y1, ny1, start1, items1 = segmentGridNumba(*ends(since), np.arange(len(since)), h)
-      two = (x1, y1, ny1, start1, since[items1])
+    (x0, y0), (nx, ny) = box[0], (np.floor((box[1] - box[0]) / h).astype(np.int64) + 1)
+    grids = [*grids, segmentGridNumba(V, e, moved if grids else np.arange(len(e)), q, x0, y0, h, int(nx), int(ny))]
+    ioff = np.concatenate([[0], np.cumsum([len(g[1]) for g in grids])])
     if len(q):
-      loop(np.ascontiguousarray(V), np.ascontiguousarray(e, dtype=np.int64), q, grid[0], grid[1], h, *grid[2:], *two, isX)
-    return isX, grid
+      loop(np.ascontiguousarray(V), np.ascontiguousarray(e, dtype=np.int64), q, x0, y0, h, int(ny), np.vstack([g[0] for g in grids]),
+           np.concatenate([g[1] for g in grids]), ioff, isX)
+    return isX, grids
   if len(q) == 0:
-    return isX, None
-  a, b = ends(slice(None))
+    return isX, grids
+  a, b = V[e[:, 0]], V[e[:, 1]]
   d = b - a
   c = np.floor((a + d / 2) / np.linalg.norm(d, axis=1).max()).astype(np.int64)
   c -= c.min(axis=0) - 1
@@ -187,7 +193,7 @@ def crossing(V, e, isM, h, grid=None, since=None):
     t = (w[:, 0] * d[i, 1] - w[:, 1] * d[i, 0]) / den
   x = (s > 0) & (s < 1) & (t > 0) & (t < 1) & ~np.any((e[i] == e[j, 0][:, None]) | (e[i] == e[j, 1][:, None]), axis=1)
   isX[i[x]] = True
-  return isX, None
+  return isX, grids
 
 
 __all__ = []
