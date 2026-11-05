@@ -887,12 +887,13 @@ def buildBoundary(c, seg, ebsd, inner=False):
   F = c.F[keep]
 
   # the point left of a segment: the site of its first grain, or the mirror of the second
-  # site in the segment where the first side is outside
+  # site in the segment where the first side is outside; both read the faces before they were
+  # straightened, where every face is the bisector of its sites
   def leftOf(r):
-    mid = (c.V[F[r, 0]] + c.V[F[r, 1]]) / 2
+    mid = (c.V0[F[r, 0]] + c.V0[F[r, 1]]) / 2
     return np.where((p1[r] >= 0)[:, None], sites.pos[s1[r]], 2 * mid - sites.pos[s2[r]])
 
-  idx, F = _walkOrder(F, c.V, leftOf)
+  idx, F = _walkOrder(F, c.V0, leftOf)
   inMap = (sites.pixel >= 0) | sites.isHole
   return grainBoundary(c.V, F, gid[idx], eid[idx], pid[idx], mori[idx], ebsd.CSList, c.plane, ebsd.frame, scanUnit=ebsd.scanUnit,
                        pixelDist=pixelDistance(c.V, F, sites.pos[s1[idx]], sites.pos[s2[idx]], inMap[s1[idx]] & inMap[s2[idx]]))

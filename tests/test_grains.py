@@ -332,12 +332,12 @@ def test_update_carriesAGrainsNewPhaseToItsBoundary():
 # ------------------------------------------------------------------ the areas M3 and M4 left open
 
 # the edge of the map is not the edge of a hole: the rim cell is absorbed as a cell in its
-# place further in would be, and the outline gives up a quarter of it
+# place further in would be, and the outline runs straight across it, as in MATLAB
 @pytest.mark.parametrize("alpha", (3.1, 20.0))
 def test_calcGrains_rimCellIsAbsorbedWhateverAlpha(alpha):
   e = blockMap(SQ3, 1, 7, notIndexed=((3, 3, 0.0), (0, 3, 0.0)))
   g = calcGrains(e[e.isIndexed], angle=5 * degree, alpha=alpha)
-  assert len(g) == 1 and g.numPixel[0] == 47 and close(g.area.sum(), 48.75)
+  assert len(g) == 1 and g.numPixel[0] == 47 and close(g.area.sum(), 49)
 
 
 # a bay of radius 4 is wider than the disk, so its middle stays out of the map

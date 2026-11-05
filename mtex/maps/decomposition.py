@@ -34,10 +34,10 @@ def _gather(values, ind, fill):
 
 class siteSet:
   """the sites of the decomposition: their positions, lattice indices, measurements, which are
-  holes, the lookup from lattice cell to site and its offset"""
+  holes, the lookup from lattice cell to site and its offset, and the test of the filled cells"""
 
-  def __init__(self, pos, ij, pixel, isHole, lookup, offset):
-    self.pos, self.ij, self.pixel, self.isHole, self.lookup, self.offset = pos, ij, pixel, isHole, lookup, offset
+  def __init__(self, pos, ij, pixel, isHole, lookup, offset, fill=None):
+    self.pos, self.ij, self.pixel, self.isHole, self.lookup, self.offset, self.fill = pos, ij, pixel, isHole, lookup, offset, fill
 
   def __len__(self):
     return len(self.pixel)
@@ -54,10 +54,13 @@ class cellComplex:
     sites - measurement sites represented by the cells
     A - lattice basis
     plane - mapPlane of the geometry
-    shape - cell or map shape metadata"""
+    shape - cell or map shape metadata
+    V0 - the vertices before the boundaries were straightened, where every face is the
+        bisector of its two sites; V by default"""
 
-  def __init__(self, V, F, cells, sites, A, plane, shape):
+  def __init__(self, V, F, cells, sites, A, plane, shape, V0=None):
     self.V, self.F, self.cells, self.sites, self.A, self.plane, self.shape = V, F, cells, sites, A, plane, shape
+    self.V0 = V if V0 is None else V0
 
   @property
   def site2pixel(self):
@@ -68,6 +71,16 @@ class cellComplex:
   def siteIJ(self):
     """the lattice indices of the sites"""
     return self.sites.ij
+
+  @property
+  def inFill(self):
+    """where a point lies to the filled cells, positive inside them; None without any"""
+    return self.sites.fill
+
+  @property
+  def dxy(self):
+    """the representative spacing of the lattice"""
+    return float((np.linalg.norm(self.A[:, 0]) + np.linalg.norm(self.A[:, 1])) / 2)
 
   @property
   def nSites(self):
@@ -176,16 +189,59 @@ def hullCells(cells, dims):
   return (j >= lo[:, None] - 1e-9) & (j <= hi[:, None] + 1e-9)
 
 
-def steps(seed, mask, stencil, n):
+def geoDist(seed, mask, stencil, n):
   """the number of stencil steps from the seed to every cell of the mask, through the mask,
-  infinite beyond n"""
-  d = np.full(seed.shape, np.inf)
-  reached = front = seed
+  infinite beyond n, and the flat index of the seed cell each is counted from"""
+  d = np.where(seed.reshape(-1), 0.0, np.inf)
+  src = np.where(seed.reshape(-1), np.arange(d.size), -1)
+  m = np.flatnonzero(mask)
+  nb = m[:, None] + (stencil[:, 0] * seed.shape[1] + stencil[:, 1])[None, :]
   for k in range(1, n + 1):
-    front = dilate(front, stencil) & mask & ~reached
-    d[front] = k
-    reached = reached | front
-  return d
+    eq = d[nb] == k - 1
+    j = eq.argmax(axis=1)
+    hit = eq[np.arange(len(m)), j] & np.isinf(d[m])
+    if not hit.any():
+      break
+    d[m[hit]] = k
+    src[m[hit]] = src[nb[hit, j[hit]]]
+  return d.reshape(seed.shape), src
+
+
+def closedAt(x, present, outside, offs):
+  """the closing of the present cells by the offsets, at the flat raster cells x alone"""
+  o = offs[:, 0] * present.shape[1] + offs[:, 1]
+  pr, out = present.reshape(-1), outside.reshape(-1)
+  y = np.unique((x[:, None] + o).reshape(-1))
+  y = y[~out[y]]
+  dil = out.copy()
+  dil[y] = pr[y[:, None] + o].any(axis=1)
+  return pr[x] | dil[x[:, None] + o].all(axis=1) & ~out[x]
+
+
+def openCorridors(closed, ext, present, outside, A, alpha, stencil):
+  """a hole joined to the outside by a filled path of at most 2 ceil(alpha) steps stays joined,
+  through what the largest smaller closing that keeps it joined leaves open, so that a larger
+  alpha keeps every grain a smaller one joins; repeated while the outside grows, as a hole that
+  joined it can bring the next one within reach"""
+  n = 2 * int(np.ceil(alpha))
+  dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
+  radii = [alpha - 1 - k for k in range(int(np.floor(alpha - 2 + 1e-10)) + 1)] + [0]
+  so = stencil[:, 0] * closed.shape[1] + stencil[:, 1]
+  closed, prev = closed.copy(), None
+  while prev is None or not np.array_equal(ext, prev):
+    prev = ext
+    f = closed & ~present
+    dHole, hole = geoDist(~closed & ~ext, f, stencil, n)
+    corridor = np.flatnonzero(f & (geoDist(ext, f, stencil, n)[0] + dHole <= n))
+    for r in radii:
+      corridor = corridor[closed.reshape(-1)[corridor] & ~ext.reshape(-1)[hole[corridor]]]
+      if len(corridor) == 0:
+        break
+      x = corridor[~closedAt(corridor, present, outside, diskOffsets(A, r * dxy, stencil))]
+      closed.reshape(-1)[x] = False
+      if ext.reshape(-1)[x[:, None] + so].any():
+        ext = floodBorder(~closed, stencil)
+  return closed, ext
 
 
 def recesses(material, A, r, stencil):
@@ -233,7 +289,8 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   # the edge of the map is not the edge of a hole: beyond the convex hull of the indexed cells
   # the material counts as present while the closing erodes, so a gap along the edge closes
   # as one further in would
-  closed = alphaClose(isPresent, l.A, r, st, ~hullCells(np.stack([a[present], b[present]], axis=1), dims))
+  outside = ~hullCells(np.stack([a[present], b[present]], axis=1), dims)
+  closed = alphaClose(isPresent, l.A, r, st, outside)
   # a cell with material on more than half of its stencil is a one cell recess, which the
   # alpha shape fills; filling the mouth of a slit exposes the next cell
   while alpha >= 1:
@@ -241,15 +298,7 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
     if not add.any():
       break
     closed |= add
-  ext = floodBorder(~closed, st)
-  # a hole joined to the outside by a filled path of at most 2 ceil(alpha) steps is part of the
-  # outside, and so is the path
-  k = 2 * int(np.ceil(alpha))
-  path = closed & ~isPresent
-  path &= steps(ext, path, st, k) + steps(~closed & ~ext, path, st, k) <= k
-  if path.any():
-    closed &= ~path
-    ext = floodBorder(~closed, st)
+  closed, ext = openCorridors(closed, floodBorder(~closed, st), isPresent, outside, l.A, alpha, st)
   material = ~ext
   filled = closed & ~isPresent                 # the neighbours grow into these
   # the band, one ring outside, closes the map's cells; a band cell touching only filled cells,
@@ -264,8 +313,6 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   ns = len(flat)
   lookup = np.full(dims, NO_PIXEL, dtype=np.int32)
   lookup.reshape(-1)[flat] = np.arange(ns, dtype=np.int32)
-  sa, sb = np.unravel_index(flat, dims)
-  sij = np.stack([sa + lo[0], sb + lo[1]], axis=1).astype(np.int32)
   # a cell of the outer rings carries no measurement even where one was made there: the
   # rings only bound the map's cells, and a ring cell that took its pixel would segment
   # into a grain of its own
@@ -276,13 +323,53 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   # smooth distortion of the map as the measurements do and not the affine fit of the whole
   from scipy import ndimage
   near = ndimage.distance_transform_edt(~hasPixel, return_distances=False, return_indices=True)
-  nearest = pixelOf.reshape(-1)[np.ravel_multi_index((near[0].reshape(-1)[flat], near[1].reshape(-1)[flat]), dims)]
-  step = (sij - ij.take(nearest, axis=0)).astype(P.dtype)
-  pos = (P.take(nearest, axis=0) + step @ l.A.T).astype(P.dtype)
-  has = np.flatnonzero(pixel >= 0)
-  pos[has] = P.take(pixel.take(has), axis=0)
-  isHole = (pixel < 0) & onMap
-  return siteSet(pos, sij, pixel, isHole, lookup, lo)
+
+  def cellPos(cells):
+    sij = (np.stack(np.unravel_index(cells, dims), axis=1) + lo).astype(np.int32)
+    nearest = pixelOf.reshape(-1)[np.ravel_multi_index((near[0].reshape(-1)[cells], near[1].reshape(-1)[cells]), dims)]
+    return (P.take(nearest, axis=0) + (sij - ij.take(nearest, axis=0)).astype(P.dtype) @ l.A.T).astype(P.dtype), sij
+
+  pos, sij = cellPos(flat)
+  # a site on the map without an indexed pixel is a hole, part of a notIndexed grain
+  isHole = onMap & ~isPresent.reshape(-1)[flat]
+  fill = fillDistance(filled, lo, P[present], ij[present], l.A, st, cellPos) if filled.any() else None
+  return siteSet(pos, sij, pixel, isHole, lookup, lo, fill)
+
+
+class fillDistance:
+  """where a point lies to the cells the closing filled: the distance to the nearest other cell
+  centre minus the one to the nearest filled, positive inside them. On a rigid lattice both are
+  among the four lattice points around the point, on a distorted one they are searched among the
+  filled cells and the others within two cells of them"""
+
+  def __init__(self, fill, lo, P, ij, A, stencil, cellPos):
+    self.fill, self.lo = fill, np.asarray(lo)
+    X = np.column_stack([np.ones(len(ij)), ij]).astype(float)
+    fit = np.linalg.lstsq(X, P.astype(float), rcond=None)[0]
+    dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
+    self.rigid = np.mean(np.linalg.norm(P - X @ fit, axis=1)) / dxy < 1e-2
+    self.p0, self.M = fit[0], fit[1:]
+    if not self.rigid:
+      from scipy.spatial import cKDTree
+      ring = dilate(dilate(fill, stencil), stencil) & ~fill
+      self.F, self.O = (cKDTree(cellPos(np.flatnonzero(m))[0].astype(float)) for m in (fill, ring))
+
+  def __call__(self, p):
+    p = np.asarray(p, dtype=float).reshape(-1, 2)
+    if not self.rigid:
+      return self.O.query(p)[0] - self.F.query(p)[0]
+    c = np.floor(np.linalg.solve(self.M.T, (p - self.p0).T).T)
+    dF, dO = np.full(len(p), np.inf), np.full(len(p), np.inf)
+    for k in ((0, 0), (1, 0), (0, 1), (1, 1)):
+      IJ = c + k
+      dist = np.linalg.norm(p - self.p0 - IJ @ self.M, axis=1)
+      rc = (IJ - self.lo).astype(np.int64)
+      inR = np.all((rc >= 0) & (rc < self.fill.shape), axis=1)
+      isF = np.zeros(len(p), dtype=bool)
+      isF[inR] = self.fill[rc[inR, 0], rc[inR, 1]]
+      dF[isF] = np.minimum(dF[isF], dist[isF])
+      dO[~isF] = np.minimum(dO[~isF], dist[~isF])
+    return dO - dF
 
 
 # ------------------------------------------------------------------ the local Voronoi
@@ -482,7 +569,67 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None):
   if unbounded:
     warnings.warn(f"the decomposition left {unbounded} cells of the map open; its sites reach beyond the closing")
   V, F, cells = meshVertices(cells, verts, l.dxy / 100 if tol is None else tol, backend=backend)
-  return cellComplex(V, F, cells, sites, l.A, l.plane, l.shape)
+  keep = joinHoles(sites, cells)
+  return cellComplex(V, F[keep], cells[keep], sites, l.A, l.plane, l.shape)
+
+
+def joinHoles(sites, cells):
+  """the empty cells of a notIndexed hole join the smallest measured pixel of the hole, the
+  cells it shares faces with, so that a hole of absent and measured pixels is one notIndexed
+  grain and a hole without any measured pixel stays empty; returns the faces that remain, the
+  ones between two cells of one pixel go"""
+  h = sites.isHole
+  empty = h & (sites.pixel < 0)
+  if not empty.any():
+    return np.arange(len(cells))
+  from .segment import components
+  both = h[cells[:, 0]] & h[cells[:, 1]]
+  lab = components(len(sites), cells[both, 0], cells[both, 1])
+  rep = np.full(len(sites), np.iinfo(np.int32).max, dtype=np.int64)
+  has = h & (sites.pixel >= 0)
+  np.minimum.at(rep, lab[has], sites.pixel[has])
+  join = empty & (rep[lab] < np.iinfo(np.int32).max)
+  sites.pixel = sites.pixel.copy()
+  sites.pixel[join] = rep[lab[join]]
+  p = sites.pixel[cells]
+  return np.flatnonzero((p[:, 0] != p[:, 1]) | (p[:, 0] < 0))
+
+
+def splitPinches(c):
+  """split the vertices where the outer boundary touches itself: four outer faces meeting in
+  one vertex, a tie of the Voronoi decomposition on the lattice, let two cells touch in a single
+  point. The vertex becomes two, half a pixel apart; inside the filled cells the two cells share
+  the face between them, elsewhere the outside passes between them"""
+  px = c.sites.pixel[c.cells]
+  nC = (px >= 0).sum(axis=1)
+  nV = len(c.V)
+  isP = (np.bincount(c.F[nC > 0].reshape(-1), minlength=nV) == 4) & (np.bincount(c.F[nC == 1].reshape(-1), minlength=nV) == 4)
+  if not isP.any():
+    return c
+  V, F, cells = c.V.copy(), c.F.copy(), c.cells.copy()
+  cell = px.max(axis=1)
+  side = np.where(px[:, 0] >= 0, c.cells[:, 0], c.cells[:, 1])
+  for v in np.flatnonzero(isP):
+    # the four faces at v counterclockwise, the first two around one cell
+    e = np.flatnonzero(np.any(c.F == v, axis=1) & (nC > 0))
+    u = V[F[e].sum(axis=1) - v] - V[v]
+    o = np.argsort(np.arctan2(u[:, 1], u[:, 0]), kind="stable")
+    if cell[e[o[0]]] != cell[e[o[1]]]:
+      o = np.roll(o, -1)
+    e, u = e[o], u[o] / np.linalg.norm(u[o], axis=1)[:, None]
+    n = len(V)
+    if c.inFill is not None and c.inFill(V[v])[0] > c.dxy / 100:
+      keep, move = [1, 2], [3, 0]
+      F = np.vstack([F, [[v, n]]])
+      cells = np.vstack([cells, [np.sort([side[e[0]], side[e[2]]])]])
+    else:
+      keep, move = [0, 1], [2, 3]
+    w = u[move].sum(axis=0)
+    V = np.vstack([V, V[v] + c.dxy / 4 * w / np.linalg.norm(w)])
+    w = u[keep].sum(axis=0)
+    V[v] = V[v] + c.dxy / 4 * w / np.linalg.norm(w)
+    F[e[move]] = np.where(F[e[move]] == v, n, F[e[move]])
+  return cellComplex(V.astype(c.V.dtype), F.astype(c.F.dtype), cells.astype(c.cells.dtype), c.sites, c.A, c.plane, c.shape)
 
 
 __all__ = ["decompose", "cellComplex"]

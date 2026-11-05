@@ -131,13 +131,19 @@ def test_S9_a_filled_hole_is_absorbed_a_boundary_through_it_is_not():
   gid = e.grainId.copy()
   g2 = calcGrains(e, angle=5 * degree)
   assert len(g2) == len(g) and np.array_equal(e.grainId, gid) and np.all(e.isIndexed[hole])
-  # the same hole straddling the boundary between two grains: the pixels the boundary
-  # runs through belong to neither and keep zero
+  # the same hole straddling the boundary between two grains: along the bisectors the boundary
+  # runs through pixels, which belong to neither and keep zero; drawn straight it runs along
+  # the pixel edges x = 9.5, and every pixel joins a grain
   ph2 = np.ones(n * n, dtype=np.int8)
   ph2[np.hypot(i - 10, j - 15) <= 1.5] = 0
   e3 = EBSD(pos, rot, ph2, phaseList(CS))
-  calcGrains(e3, angle=5 * degree)
+  calcGrains(e3, angle=5 * degree, straighten=False)
   assert (e3.grainId == 0).sum() > 0 and np.all(e3.grainId[~e3.isIndexed] >= 0)
+  e3 = EBSD(pos, rot, ph2, phaseList(CS))
+  b = calcGrains(e3, angle=5 * degree).boundary
+  V = np.asarray(b.V)[np.unique(b.F)]
+  near = (np.abs(V[:, 0] - 10) < 2) & (np.abs(V[:, 1] - 15) < 2)
+  assert (e3.grainId == 0).sum() == 0 and np.allclose(V[near, 0], 9.5, atol=1e-3)
 
 
 # ------------------------------------------------------------------ check_calcGrainsCases

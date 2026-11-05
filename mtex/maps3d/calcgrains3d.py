@@ -27,7 +27,7 @@ from .grain3d import grain3d
 
 
 def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               mcl=None, fmc=None, verbose=False, backend=None, grainId=False):
+               mcl=None, fmc=None, verbose=False, backend=None, grainId=False, straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps; MATLAB's
   grain reconstruction from 2d and 3d EBSD data
 
@@ -54,7 +54,8 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
 
   A map of the plane is divided into cells around its pixels, a Voronoi decomposition bounded
   by alpha. A not indexed region narrower than 2 alpha pixel spacings is filled by the grains
-  around it, a wider one becomes a notIndexed grain.
+  around it, a wider one becomes a notIndexed grain. The boundaries through the filled cells
+  are drawn straight between the measured pixels around them, without crossing one.
 
   The map is changed: it keeps the grain ids, the pixels the minPixel cull drops and the
   notIndexed pixels the grains absorb, so MATLAB's second output is the map passed. Run on
@@ -79,6 +80,8 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
         that would be smaller are marked notIndexed and the grains reconstructed again
     alpha - the bound of the decomposition in pixel spacings: a not indexed region
         narrower than 2 alpha is filled (map of the plane)
+    straighten - draw the boundaries through the filled cells as straight lines (True), or
+        along the bisectors between the measured pixels around them (map of the plane)
     removeQuadruplePoints - split every point where four pixels of a square grid meet into
         two triple points, joining the diagonal pair the criterion connects more (map of
         the plane)
@@ -128,8 +131,8 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     angle, grainId = DEFAULT_ANGLE, True
   if not isinstance(ebsd, EBSD3):
     return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, removeQuadruplePoints, mcl, fmc, verbose, backend,
-                         grainId)
-  planar = {"alpha": alpha != 3.1, "removeQuadruplePoints": removeQuadruplePoints, "mcl": mcl is not None,
+                         grainId, straighten)
+  planar = {"alpha": alpha != 3.1, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints, "mcl": mcl is not None,
             "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
   if any(planar.values()):
     raise TypeError(f"calcGrains of a map of volumes takes no {', '.join(k for k, v in planar.items() if v)}")

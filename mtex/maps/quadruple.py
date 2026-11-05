@@ -111,7 +111,8 @@ def splitQuadruplePoints(c, seg, ebsd, crit):
     F[f, np.where(F[f, 0] == verts, 0, 1)] = new
   newF = np.stack([verts, new], axis=1).astype(np.int32)
   newCells = np.stack([wedge[rows, (m + 1) % 4], wedge[rows, (m + 3) % 4]], axis=1)
-  c2 = cellComplex(V, np.concatenate([F, newF]), np.concatenate([c.cells, newCells]), sites, c.A, c.plane, c.shape)
+  c2 = cellComplex(V, np.concatenate([F, newF]), np.concatenate([c.cells, newCells]), sites, c.A, c.plane, c.shape,
+                   np.concatenate([c.V0, V[len(c.V):]]))
   # the criterion has never seen the new pairs, and it alone decides whether the two
   # cells a split joins are one grain
   connect = np.concatenate([seg.connect, connectivity(crit, ebsd, pix[newCells[:, 0]], pix[newCells[:, 1]])])

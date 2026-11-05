@@ -18,21 +18,23 @@ import numpy as np
 from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
 from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
-from .decomposition import NO_PIXEL, decompose
+from .decomposition import decompose, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
 from .kernels import grainKernel, pixelKernel
 from .quadruple import splitQuadruplePoints
 from .segment import segment
+from .straighten import straightenInFill
 
 
 def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               mcl=None, fmc=None, verbose=False, backend=None, grainId=False):
+               mcl=None, fmc=None, verbose=False, backend=None, grainId=False, straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
-  culls smaller grains, alpha bounds the decomposition, mcl and fmc select Markov
-  clustering and fast multiscale clustering, grainId=True joins the pixels of one grain id
-  stored with the map, ebsd.prop['grainId']. The map keeps the grain ids"""
+  culls smaller grains, alpha bounds the decomposition, straighten draws the boundaries through
+  the filled cells straight (False: along the bisectors between the pixels around them), mcl and
+  fmc select Markov clustering and fast multiscale clustering, grainId=True joins the pixels of
+  one grain id stored with the map, ebsd.prop['grainId']. The map keeps the grain ids"""
   if isinstance(angle, grainBoundaryCriterion):
     criterion, angle = angle, None
   if grainId:
@@ -52,24 +54,25 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     minPixel = 1
   releaseAbsorbed(ebsd)
   c = decompose(ebsd, alpha, backend=backend)
-  seg = segment(c, ebsd, crit, backend, mcl)
-  if minPixel > 1:
-    # the cull changes the map the closing runs on, so it is a second pass over the whole
-    # reconstruction and not a filter on the grains that came out
-    under = undersized(seg.grainId, seg.nGrains, ebsd.isIndexed.reshape(-1), minPixel)
-    if under.any():
-      markNotIndexed(ebsd, under)
-      c = decompose(ebsd, alpha, backend=backend)
-      seg = segment(c, ebsd, crit, backend, mcl)
-      # the second pass can cut a grain the cull kept into fragments below minPixel; they become
-      # not indexed where they lie, their geometry kept, as MATLAB's enforceMinPixel
-      markNotIndexed(ebsd, undersized(seg.grainId, seg.nGrains, ebsd.isIndexed.reshape(-1), minPixel))
+  # the cull changes the map the closing runs on, so it is a pass over the whole reconstruction;
+  # the first sizes the grains before the pinches are split, as MATLAB's minPixelMask, and the
+  # decomposition repeats until no grain re-fragments below minPixel
+  if minPixel > 1 and markUndersized(ebsd, segment(c, ebsd, crit, backend, mcl), minPixel):
+    c = decompose(ebsd, alpha, backend=backend)
+  while True:
+    c = splitPinches(c)
+    seg = segment(c, ebsd, crit, backend, mcl)
+    if minPixel <= 1 or not markUndersized(ebsd, seg, minPixel):
+      break
+    c = decompose(ebsd, alpha, backend=backend)
+  if straighten:
+    c, seg = straightenInFill(c, seg)
   # the diagonal ambiguity is decided on the map the grains are built from, so the split
   # runs after the cull and before anything reads the boundary
   if removeQuadruplePoints:
     c, seg = splitQuadruplePoints(c, seg, ebsd, crit)
   grains = grainTable(seg, ebsd, buildBoundary(c, seg, ebsd), buildBoundary(c, seg, ebsd, inner=True))
-  ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, backend=backend).reshape(ebsd.shape)
+  ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, grains.boundary, backend=backend, reach=int(np.ceil(alpha)) + 2).reshape(ebsd.shape)
   absorbNotIndexed(ebsd, grains)
   return grains
 
@@ -98,50 +101,69 @@ def undersized(grainId, nGrains, isIndexed, minPixel):
   return (grainId > 0) & isIndexed & (n[grainId] < minPixel)
 
 
-def markNotIndexed(ebsd, mask):
-  """the pixels of the grains the cull drops, marked as not indexed where they lie"""
-  ebsd.phaseId.reshape(-1)[mask] = 0
+def markUndersized(ebsd, seg, minPixel):
+  """mark the indexed pixels of the grains below minPixel as not indexed where they lie, and
+  say whether there were any"""
+  under = undersized(seg.grainId, seg.nGrains, ebsd.isIndexed.reshape(-1), minPixel)
+  ebsd.phaseId.reshape(-1)[under] = 0
+  return bool(under.any())
 
 
-def absorbInteriorPixels(c, ebsd, grainId, nudge=0.95, backend=None, reach=5):
+def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, reach=5):
   """give a grain to the pixels the closing left without a cell of their own
 
   A filled hole belongs to the cells that grew into it, so a pixel there lies in one grain,
-  in several, or on the boundary between them. Which cell covers a point is which site is
-  nearest to it, so the footprint of the pixel is sampled at its corners and the pixel
-  joins the grain only when every corner lands in it. Zero stays for a pixel a boundary
-  runs through."""
+  in several, or on the boundary between them. The candidates are the grains of the sites
+  nearest to the pixel, and the pixel joins the one whose polygon holds every corner of its
+  footprint, nudged inwards, off its boundary. Zero stays for a pixel a boundary runs through."""
   out = grainId.copy()
   l = ebsd.lattice
   if l is None:
     return out
-  corners = c.unitCell2d()
-  P = l.plane.to2d(ebsd.pos.data.reshape(-1, 3))
+  corners = np.ascontiguousarray(nudge * np.asarray(c.unitCell2d(), dtype=float)[:, :2])
+  P = np.ascontiguousarray(l.plane.to2d(ebsd.pos.data.reshape(-1, 3))[:, :2], dtype=float)
   siteGrain = np.zeros(c.nSites, dtype=np.int32)
   has = c.site2pixel >= 0
   siteGrain[has] = grainId[c.site2pixel[has]]
-  todo = np.flatnonzero(out == 0)
-  # the corners of all pixels in one compiled loop, the Python loop below its fallback
+  todo = np.flatnonzero((out == 0) & ~ebsd.isPadding.reshape(-1))
+  # the segments of every grain, each listed for both its sides
+  g = boundary.grainId.reshape(-1)
+  k = np.repeat(np.arange(len(boundary.F)), 2)
+  order = np.argsort(g, kind="stable")
+  order = order[g[order] > 0]
+  V = np.asarray(boundary.V, dtype=float)[:, :2]
+  seg = np.ascontiguousarray(np.column_stack([V[boundary.F[k[order], 0]], V[boundary.F[k[order], 1]]]))
+  segStart = np.searchsorted(g[order], np.arange(int(max(grainId.max(initial=0), g.max(initial=0))) + 2)).astype(np.int64)
+  s = c.sites
+  args = (todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
+          int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, segStart, seg,
+          1e-9 * c.dxy, out)
+  # all pixels in one compiled loop, its Python form below as fallback
   loop = pixelKernel("absorb", backend)
-  if loop is not None:
-    s = c.sites
-    loop(todo.astype(np.int64), np.ascontiguousarray(P[:, :2], dtype=float), np.ascontiguousarray(l.ij, dtype=np.int64),
-         np.ascontiguousarray(nudge * np.asarray(corners, dtype=float)[:, :2]), np.ascontiguousarray(s.lookup, dtype=np.int64),
-         int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, out)
-    return out
-  for k in todo:
-    g = 0
-    ok = True
-    for v in corners:
-      s = c.siteAt(P[k] + nudge * v, l.ij[k], reach)
-      gs = 0 if s == NO_PIXEL else siteGrain[s]
-      if gs == 0 or (g != 0 and gs != g):
-        ok = False
-        break
-      g = gs
-    if ok:
-      out[k] = g
+  (loop or _absorbPython)(*args)
   return out
+
+
+def _absorbPython(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, out):
+  for k in todo:
+    a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
+    block = lookup[max(0, a0 - reach):a0 + reach + 1, max(0, b0 - reach):b0 + reach + 1].reshape(-1)
+    cand = block[block >= 0]
+    cand = cand[siteGrain[cand] > 0]
+    if len(cand) == 0:
+      continue
+    d = np.sum((sitePos[cand] - P[k]) ** 2, axis=1)
+    for g in siteGrain[cand[d <= d.min() * (1 + 1e-9)]]:
+      S = seg[segStart[g]:segStart[g + 1]]
+      q = P[k] + corners
+      cross = ((S[:, 1] > q[:, 1, None]) != (S[:, 3] > q[:, 1, None])) & \
+        (q[:, 0, None] < S[:, 0] + (q[:, 1, None] - S[:, 1]) * (S[:, 2] - S[:, 0]) / np.where(S[:, 3] == S[:, 1], 1, S[:, 3] - S[:, 1]))
+      d, t = S[:, 2:] - S[:, :2], q[:, None, :] - S[:, :2]
+      u = np.clip(np.sum(t * d, axis=2) / np.maximum(np.sum(d * d, axis=1), 1e-300), 0, 1)
+      near = np.linalg.norm(t - u[..., None] * d, axis=2).min(axis=1) <= eps
+      if np.all((cross.sum(axis=1) % 2 == 1) & ~near):
+        out[k] = g
+        break
 
 
 def grainTable(seg, ebsd, boundary=None, innerBoundary=None, backend=None):

@@ -1299,33 +1299,49 @@ def _expLoop(ref, v, out):
 
 # ------------------------------------------------------------------ the compilation of these
 
-# the grain of every pixel the closing left without a cell: the grain of the site nearest
-# to each nudged corner of its footprint, searched over the lattice cells around the pixel,
-# kept only when all corners agree; calcgrains.absorbInteriorPixels is the NumPy form
-def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, out):
+# the grain of every pixel the closing left without a cell: the grains of the sites with a grain
+# nearest to its centre, searched over the lattice cells around the pixel, are the candidates,
+# and the pixel joins the first whose polygon, the segments of grain g at segStart[g] ..
+# segStart[g + 1] - 1 of seg (x1, y1, x2, y2), holds every nudged corner of its footprint
+# strictly, farther than eps from its boundary; calcgrains.absorbInteriorPixels is the NumPy form
+def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, out):
   n1, n2 = lookup.shape
   for t in prange(len(todo)):
     k = todo[t]
     a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
-    g = 0
-    ok = True
-    for c in range(corners.shape[0]):
-      qx, qy = P[k, 0] + corners[c, 0], P[k, 1] + corners[c, 1]
-      best, bestD = -1, np.inf
-      for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
-        for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
-          s = lookup[a, b]
-          if s >= 0:
-            d = (sitePos[s, 0] - qx) ** 2 + (sitePos[s, 1] - qy) ** 2
-            if d < bestD:
-              best, bestD = s, d
-      gs = 0 if best < 0 else siteGrain[best]
-      if gs == 0 or (g != 0 and gs != g):
-        ok = False
+    px, py = P[k, 0], P[k, 1]
+    bestD = np.inf
+    for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
+      for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
+        s = lookup[a, b]
+        if s >= 0 and siteGrain[s] > 0:
+          bestD = min(bestD, (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2)
+    for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
+      for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
+        s = lookup[a, b]
+        if s < 0 or siteGrain[s] <= 0 or (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2 > bestD * (1 + 1e-9):
+          continue
+        g = siteGrain[s]
+        ok = True
+        for c in range(corners.shape[0]):
+          qx, qy = px + corners[c, 0], py + corners[c, 1]
+          inside = False
+          near = False
+          for m in range(segStart[g], segStart[g + 1]):
+            x1, y1, x2, y2 = seg[m, 0], seg[m, 1], seg[m, 2], seg[m, 3]
+            if (y1 > qy) != (y2 > qy) and qx < x1 + (qy - y1) * (x2 - x1) / (y2 - y1):
+              inside = not inside
+            dx, dy = x2 - x1, y2 - y1
+            u = min(1.0, max(0.0, ((qx - x1) * dx + (qy - y1) * dy) / max(dx * dx + dy * dy, 1e-300)))
+            near = near or (qx - x1 - u * dx) ** 2 + (qy - y1 - u * dy) ** 2 <= eps * eps
+          if near or not inside:
+            ok = False
+            break
+        if ok:
+          out[k] = g
+          break
+      if out[k] > 0:
         break
-      g = gs
-    if ok:
-      out[k] = g
 
 
 _PIXEL_HELPERS = ("_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",

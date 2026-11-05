@@ -13,7 +13,8 @@ from .quadruple import *  # noqa: F401,F403
 from .grains import grain2d
 from .calcgrains import calcGrains
 from .boundaryresampling import mustKeep, mergeRuns, sharedVertices
-from .smoothing import boundaryFilter, laplaceFilter, taubinFilter, curvatureFilter, huberFilter, boundaryNetwork
+from .smoothing import (boundaryFilter, laplaceFilter, taubinFilter, curvatureFilter, huberFilter, boundaryNetwork,
+                        pixelCells)
 from .shape import shape2d, polygonMoments
 from .traces import calcTraces
 from .intragranular import neighbourBall
@@ -36,10 +37,10 @@ __all__ = ["phaseList", "phaseColorNames", "colorTriplet", "lattice", "mapPlane"
            "gridify", "decompose", "cellComplex", "grainBoundaryCriterion", "gbcAngle", "gbcSoft", "gbcEqual",
            "gbcCustom", "connectivity", "gbcFMC", "grainBoundary", "triplePointList", "triplePoints", "chainOrder",
            "grain2d", "calcGrains", "mustKeep", "mergeRuns", "sharedVertices", "boundaryFilter", "laplaceFilter",
-           "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "shape2d", "polygonMoments",
-           "calcTraces", "neighbourBall", "parentGrainReconstructor", "voteTable", "majorityVote", "mclComponents",
-           "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList", "rescale", "imboxfilt", "edgeMap",
-           "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent", "shift", "transform",
+           "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells", "shape2d",
+           "polygonMoments", "calcTraces", "neighbourBall", "parentGrainReconstructor", "voteTable", "majorityVote",
+           "mclComponents", "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList", "rescale", "imboxfilt",
+           "edgeMap", "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent", "shift", "transform",
            "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary",
            "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis",
            "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape",
