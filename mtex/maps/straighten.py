@@ -53,27 +53,40 @@ def straightenInFill(c, seg):
   # the boundary vertices alone, numbered from 0 in e
   vB, e = np.unique(F[isB], return_inverse=True)
   e = e.reshape(-1, 2).astype(np.int64)
-  from scipy.sparse import coo_matrix, diags
+  from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
-  A = coo_matrix((np.ones(2 * len(e)), (e.reshape(-1), e[:, ::-1].reshape(-1))), shape=(len(vB), len(vB))).tocsr()
-  deg = np.asarray(A.sum(axis=1)).reshape(-1)
+  nB = len(vB)
+  deg = np.bincount(e.reshape(-1), minlength=nB).astype(float)
+  I, J = np.concatenate([e[:, 0], e[:, 1]]), np.concatenate([e[:, 1], e[:, 0]])
   W0 = V[vB]
   isFixed = inFill(W0) <= tol
   # every round solves only the chains a vertex held in the last one belongs to
-  solve, lab, W = ~isFixed, np.full(len(vB), -1), W0
+  solve, lab, W = ~isFixed, np.full(nB, -1), W0
   while True:
     Wlast, W = W, W.copy()
     W[isFixed] = W0[isFixed]
-    mi, fi = np.flatnonzero(solve & ~isFixed), np.flatnonzero(isFixed)
+    mi = np.flatnonzero(solve & ~isFixed)
     if len(mi):
-      Am = A[mi]
-      W[mi] = spsolve((diags(deg[mi] + 1e-3) - Am[:, mi]).tocsc(), Am[:, fi] @ W0[fi] + 1e-3 * W0[mi]).reshape(-1, 2)
-      lab[mi] = connected_components(Am[:, mi], directed=False)[1] + lab.max() + 1
+      # (D + 1e-3) W - A W = A W0 over the held neighbours + 1e-3 W0, the free vertices in their order
+      loc = np.full(nB, -1)
+      loc[mi] = np.arange(len(mi))
+      li, lj = loc[I], loc[J]
+      ff = (li >= 0) & (lj >= 0)
+      n = len(mi)
+      M = coo_matrix((np.concatenate([deg[mi] + 1e-3, -np.ones(ff.sum())]), (np.concatenate([np.arange(n), li[ff]]),
+                      np.concatenate([np.arange(n), lj[ff]]))), shape=(n, n)).tocsc()
+      fx = (li >= 0) & isFixed[J]
+      key, cnt = np.unique(li[fx].astype(np.int64) * nB + J[fx], return_counts=True)
+      r, col = key // nB, key % nB
+      rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
+      W[mi] = spsolve(M, rhs).reshape(-1, 2)
+      lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
 
     # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
-    isM = np.any(W != Wlast, axis=1)[e].any(axis=1)
-    bad = crossing(W, e, isM, dxy)
+    chg = np.any(W != Wlast, axis=1)
+    isM = chg[e[:, 0]] | chg[e[:, 1]]
+    bad = crossing(W, e, isM, 4 * dxy)
     bad[isM] |= sweepsOut(W0, W, e[isM], dxy, inFill, tol)
     if not bad.any():
       break
