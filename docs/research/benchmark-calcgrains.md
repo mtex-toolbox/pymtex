@@ -319,6 +319,39 @@ round 3 for 20 000), the rounds halve from 12 instead of ending after 5, and the
 per round; a threshold on the move changed nothing, the moves are not rounding. The straighter result and
 its price are the decision; it leaves the parity with MATLAB develop (`bench/calcgrains_ops.py`).
 
+**The 39 000 segments found out of the fill where they are.** In round 2, 39 058 segments of 1C_1 whose
+ends are back at their old positions fail the sweep test at their old position itself. They are the faces
+between two *direct-neighbour* measured pixels of different grains that continue into the fill: the sample
+points lie 0.53 to 0.66 px from both pixels, on their shared cell edge, up to 0.44 px out of the fill, while
+both ends sit on the fill's edge (fill distance -7e-12), so the bisection, which cuts only where the sign
+changes between the ends, never cuts them. Legitimate: that part of the boundary must not move. The cost is a
+retest per round and the inside end of each held where a cut at the fill entry would let it move; MATLAB
+develop has the same, so it stays for parity (`docs/plans/develop-fixes.md`).
+
+**The second rule under study, `CHAIN_DP`** (off, `mtex/maps/straighten.py`): the first solve places the
+free junctions, which are then held; every chain of degree-two vertices between held vertices is then
+straightened on its own, Douglas-Peucker on its chord (`chainsNumba` walks the chains, `chainDPNumba` runs
+them in parallel: the vertices between two decided ones evenly on the chord, a failing sweep pins the vertex
+farthest from the chord and does both parts again); a junction whose segment to a decided vertex sweeps out
+goes back and its chains are done again (81 000 of them on 1C_1), both segments of a crossing keep their
+vertices (the crossing test reports the partner; pinning only the query looped forever). Six iterations on
+1C_1, four on forsterite, no global rounds after the first solve.
+
+| | default | PIN_FARTHEST (A) | CHAIN_DP |
+|---|---:|---:|---:|
+| 1C_1 straightenInFill, laptop | 1.05 s | 1.75 s | 1.04 s |
+| 1C_1 boundary length | 162 566 µm | 161 703 (-0.53 %) | 161 876 (-0.42 %) |
+| 1C_1 vertices moved | 200 530 | 308 926 | 331 302 |
+| 1C_1 pixels changing grain | | 18 271 notIndexed | 25 673 notIndexed (13 359 absorbed, 12 314 released), none between two grains, so no indexed pixel |
+| forsterite calcGrains, laptop | 0.427 s | 0.468 s | 0.403 s |
+| forsterite boundary length | 2 052 205 µm | 2 036 501 (-0.77 %) | 2 038 710 (-0.66 %) |
+| forsterite pixels changing grain | | 1 404 notIndexed | 1 613 notIndexed, no indexed pixel |
+| calcGrains, bayes (e3f5629, one job, load 11-12) | 1C_1 4.92 s, forsterite 0.366 s | 1C_1 5.63 s, forsterite 0.400 s | 1C_1 4.92 s, forsterite 0.377 s |
+
+CHAIN_DP gives A's straightness at the default's cost: what remains of its time is round 1 (setup 0.28 s,
+solve 0.1 s) and the chain pass (0.16 s), the junction redo (0.06 s), one crossing check (0.12 s). Both
+rules change the result and leave the parity with MATLAB develop; the choice is Ralf's.
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three

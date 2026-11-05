@@ -177,3 +177,9 @@ numbers. Not fixed; each waits for a decision.
   inside the other grain of a tie stays at 0 (forsterite: 597 pixels, 199 of the first 200 checked to
   lie in one of MATLAB's own grain polygons). The port tests the grains of all tied nearest sites and
   takes a corner on a boundary as outside.
+- `straightenInFill` cuts a boundary segment where the fill test changes sign between its ends, so a
+  face between two direct-neighbour pixels of different grains that continues into the fill - its ends
+  on the fill's edge, its middle on the pixels' shared cell edge up to 0.44 px out of the fill - is never
+  cut: on 1C_1 39 058 such segments fail the sweep test at their original position every round and hold
+  their inside end, which a cut at the fill entry (the minimum of the fill distance along the segment,
+  not the sign change) would let move. The same in both ports, kept for parity (2026-11-05).
