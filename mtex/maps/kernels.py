@@ -1520,10 +1520,21 @@ def _segmentGrid(a, b, sel, x0, y0, h, nx, ny):
     for i in range(int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h) + 1):
       for j in range(int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h) + 1):
         near[i * ny + j] = True
+  # the segments whose box meets one of those cells
+  cand = np.empty(a.shape[0], np.int64)
+  n = 0
+  for s in range(a.shape[0]):
+    hit = False
+    for i in range(int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h) + 1):
+      for j in range(int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h) + 1):
+        hit = hit or near[i * ny + j]
+    if hit:
+      cand[n] = s
+      n += 1
   start = np.zeros(nx * ny + 1, np.int64)
   items = np.empty(0, np.int64)
   for p in range(2):
-    for s in range(a.shape[0]):
+    for s in cand[:n]:
       i0, i1 = int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h)
       j0, j1 = int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h)
       for i in range(i0, i1 + 1):
