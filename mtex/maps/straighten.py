@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .decomposition import cellComplex
-from .kernels import pixelKernel, segmentGridNumba
+from .kernels import adjacencyNumba, pixelKernel, segmentGridNumba
 from .segment import segmentation
 
 
@@ -29,12 +29,17 @@ def straightenInFill(c, seg):
   # the boundary: the faces between two grains or against the outside, the segmentation's outer ones
   V, F, cells, isB = c.V.astype(float), c.F, c.cells, seg.isOuter.copy()
 
+  # the fill test at every boundary vertex once
+  used = np.zeros(len(V), dtype=bool)
+  used[F[isB]] = True
+  dV = np.full(len(V), np.nan)
+  dV[used] = inFill(V[used])
   # a boundary segment entering the filled cells gets a vertex there, by bisection
-  dE = inFill(V[F[isB]].reshape(-1, 2)).reshape(-1, 2)
+  dE = dV[F[isB]]
   cut = np.flatnonzero(isB)[(dE.max(axis=1) > tol) & (dE.min(axis=1) < -tol)]
   a, b = V[F[cut, 0]], V[F[cut, 1]]
   lo, hi = np.zeros((len(cut), 1)), np.ones((len(cut), 1))
-  aIn = inFill(a) > 0
+  aIn = dV[F[cut, 0]] > 0
   for _ in range(16):
     mid = (lo + hi) / 2
     isA = (inFill(a + mid * (b - a)) > 0) == aIn
@@ -42,29 +47,32 @@ def straightenInFill(c, seg):
   nV = len(V)
   new = nV + np.arange(len(cut))
   V = np.vstack([V, a + (lo + hi) / 2 * (b - a)])
+  dV = np.concatenate([dV, inFill(V[nV:])])
   F = np.vstack([F, np.column_stack([new, F[cut, 1]])])
   F[cut, 1] = new
   cells = np.vstack([cells, cells[cut]])
   isB = np.concatenate([isB, np.ones(len(cut), dtype=bool)])
 
-  # the boundary vertices alone, numbered from 0 in e
-  vB, e = np.unique(F[isB], return_inverse=True)
-  e = e.reshape(-1, 2).astype(np.int64)
+  # the boundary vertices alone, numbered from 0 in e in the order of V
+  used = np.concatenate([used, np.ones(len(cut), dtype=bool)])
+  vB = np.flatnonzero(used)
+  e = (np.cumsum(used) - 1)[F[isB]].astype(np.int64)
   from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
   nB, m = len(vB), len(e)
-  # the half edges by their first vertex: the neighbour and the segment of each
-  I = np.concatenate([e[:, 0], e[:, 1]])
-  order = np.argsort(I, kind="stable")
-  ptr = np.concatenate([[0], np.cumsum(np.bincount(I, minlength=nB))])
-  nbr, hseg = np.concatenate([e[:, 1], e[:, 0]])[order], np.concatenate([np.arange(m), np.arange(m)])[order]
+  # the half edges by their first vertex: the segment and the neighbour of each, counting sorted
+  ptr = np.concatenate([[0], np.cumsum(np.bincount(e.reshape(-1), minlength=nB))])
+  hseg = adjacencyNumba(e, ptr)
+  if hseg is None:
+    hseg = np.repeat(np.arange(m), 2)[np.argsort(e.reshape(-1), kind="stable")]
+  nbr = e[hseg].sum(axis=1) - np.repeat(np.arange(nB), np.diff(ptr))
   deg = np.diff(ptr)
   W0 = V[vB]
-  isFixed = inFill(W0) <= tol
+  isFixed = dV[vB] <= tol
   # every round solves only the chains a vertex held in the last one belongs to, and samples and
   # tests the segments that moved
-  W, mi, reset, lab, loc, grid, since = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), None, []
+  W, mi, reset, lab, loc, grid, since = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), None, None
   while True:
     moved = [reset[np.any(W[reset] != W0[reset], axis=1)]]
     W[reset] = W0[reset]
@@ -89,8 +97,8 @@ def straightenInFill(c, seg):
     isM = np.zeros(m, dtype=bool)
     isM[hseg[_ranges(ptr, moved)]] = True
     if grid is not None:
-      since.append(moved)
-    bad, grid = crossing(W, e, isM, 4 * dxy, grid, np.unique(hseg[_ranges(ptr, np.concatenate(since))]) if since else None)
+      since = isM if since is None else since | isM
+    bad, grid = crossing(W, e, isM, 4 * dxy, grid, None if since is None else np.flatnonzero(since))
     # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
     bad[isM] |= sweepsOut(W0, W, e[isM], dxy, inFill, tol)
     if not bad.any():
