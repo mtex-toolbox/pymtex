@@ -53,43 +53,52 @@ def straightenInFill(c, seg):
   from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
-  nB = len(vB)
-  deg = np.bincount(e.reshape(-1), minlength=nB).astype(float)
-  I, J = np.concatenate([e[:, 0], e[:, 1]]), np.concatenate([e[:, 1], e[:, 0]])
+  nB, m = len(vB), len(e)
+  # the half edges by their first vertex: the neighbour and the segment of each
+  I = np.concatenate([e[:, 0], e[:, 1]])
+  order = np.argsort(I, kind="stable")
+  ptr = np.concatenate([[0], np.cumsum(np.bincount(I, minlength=nB))])
+  nbr, hseg = np.concatenate([e[:, 1], e[:, 0]])[order], np.concatenate([np.arange(m), np.arange(m)])[order]
+  deg = np.diff(ptr)
   W0 = V[vB]
   isFixed = inFill(W0) <= tol
-  # every round solves only the chains a vertex held in the last one belongs to
-  solve, lab, W = ~isFixed, np.full(nB, -1), W0
+  # every round solves only the chains a vertex held in the last one belongs to, and samples and
+  # tests the segments that moved
+  W, mi, reset, lab, loc, grid, since = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), None, []
   while True:
-    Wlast, W = W, W.copy()
-    W[isFixed] = W0[isFixed]
-    mi = np.flatnonzero(solve & ~isFixed)
+    moved = [reset[np.any(W[reset] != W0[reset], axis=1)]]
+    W[reset] = W0[reset]
     if len(mi):
       # (D + 1e-3) W - A W = A W0 over the held neighbours + 1e-3 W0, the free vertices in their order
-      loc = np.full(nB, -1)
-      loc[mi] = np.arange(len(mi))
-      li, lj = loc[I], loc[J]
-      ff = (li >= 0) & (lj >= 0)
       n = len(mi)
-      M = coo_matrix((np.concatenate([deg[mi] + 1e-3, -np.ones(ff.sum())]), (np.concatenate([np.arange(n), li[ff]]),
+      rows, j = np.repeat(np.arange(n), deg[mi]), nbr[_ranges(ptr, mi)]
+      loc[mi] = np.arange(n)
+      lj = loc[j]
+      loc[mi] = -1
+      ff, fx = lj >= 0, isFixed[j]
+      M = coo_matrix((np.concatenate([deg[mi] + 1e-3, -np.ones(ff.sum())]), (np.concatenate([np.arange(n), rows[ff]]),
                       np.concatenate([np.arange(n), lj[ff]]))), shape=(n, n)).tocsc()
-      fx = (li >= 0) & isFixed[J]
-      key, cnt = np.unique(li[fx].astype(np.int64) * nB + J[fx], return_counts=True)
+      key, cnt = np.unique(rows[fx].astype(np.int64) * nB + j[fx], return_counts=True)
       r, col = key // nB, key % nB
       rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
-      W[mi] = spsolve(M, rhs).reshape(-1, 2)
+      Wm = spsolve(M, rhs).reshape(-1, 2)
+      moved.append(mi[np.any(Wm != W[mi], axis=1)])
+      W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
-
+    moved = np.concatenate(moved)
+    isM = np.zeros(m, dtype=bool)
+    isM[hseg[_ranges(ptr, moved)]] = True
+    if grid is not None:
+      since.append(moved)
+    bad, grid = crossing(W, e, isM, 4 * dxy, grid, np.unique(hseg[_ranges(ptr, np.concatenate(since))]) if since else None)
     # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
-    chg = np.any(W != Wlast, axis=1)
-    isM = chg[e[:, 0]] | chg[e[:, 1]]
-    bad = crossing(W, e, isM, 4 * dxy)
     bad[isM] |= sweepsOut(W0, W, e[isM], dxy, inFill, tol)
     if not bad.any():
       break
     v = e[bad].reshape(-1)
-    solve = np.isin(lab, lab[v])
+    reset = np.unique(v[~isFixed[v]])
     isFixed[v] = True
+    mi = np.flatnonzero(np.isin(lab, lab[v]) & ~isFixed)
   V0, V = V, V.copy()
   V[vB] = W
   ix = np.concatenate([np.arange(len(c.F)), cut])
@@ -118,19 +127,35 @@ def sweepsOut(V0, V, em, dxy, inFill, tol):
   return np.bincount(sid, weights=inFill(P) < -tol, minlength=len(em)) > 0
 
 
-def crossing(V, e, isM, h):
-  """the segments of e with isM that cross another one of e properly, without a common vertex:
-  the pairs whose bounding boxes share a cell of a grid of spacing h, compiled, or those whose
-  midpoints lie in neighbouring cells of a grid as large as the longest segment"""
+# the concatenated index ranges ptr[v] .. ptr[v + 1] - 1 of the vertices v
+def _ranges(ptr, v):
+  n = ptr[v + 1] - ptr[v]
+  return np.repeat(ptr[v] - np.cumsum(n) + n, n) + np.arange(n.sum())
+
+
+def crossing(V, e, isM, h, grid=None, since=None):
+  """the segments of e with isM that cross another one of e properly, without a common vertex,
+  and the grid of spacing h the compiled test lists the segments in: the one given, built where
+  the segments were, with those moved since, the segments since, in a second one, or a new one.
+  Without numba the pairs whose midpoints lie in neighbouring cells of a grid as large as the
+  longest segment"""
   isX = np.zeros(len(e), dtype=bool)
   q = np.flatnonzero(isM)
+  ends = lambda k: (np.ascontiguousarray(V[e[k, 0]]), np.ascontiguousarray(V[e[k, 1]]))
+  loop = pixelKernel("crossing")
+  if loop is not None:
+    if grid is None:
+      grid = segmentGridNumba(*ends(slice(None)), np.arange(len(e)), h)
+    two = (grid[0], grid[1], 1, np.zeros(2, dtype=np.int64), np.zeros(0, dtype=np.int64))
+    if since is not None and len(since):
+      x1, y1, ny1, start1, items1 = segmentGridNumba(*ends(since), np.arange(len(since)), h)
+      two = (x1, y1, ny1, start1, since[items1])
+    if len(q):
+      loop(np.ascontiguousarray(V), np.ascontiguousarray(e, dtype=np.int64), q, grid[0], grid[1], h, *grid[2:], *two, isX)
+    return isX, grid
   if len(q) == 0:
-    return isX
-  a, b = np.ascontiguousarray(V[e[:, 0]]), np.ascontiguousarray(V[e[:, 1]])
-  grid = segmentGridNumba(a, b, q, h)
-  if grid is not None:
-    pixelKernel("crossing")(a, b, np.ascontiguousarray(e, dtype=np.int64), q, grid[0], grid[1], h, *grid[2:], isX)
-    return isX
+    return isX, None
+  a, b = ends(slice(None))
   d = b - a
   c = np.floor((a + d / 2) / np.linalg.norm(d, axis=1).max()).astype(np.int64)
   c -= c.min(axis=0) - 1
@@ -154,7 +179,7 @@ def crossing(V, e, isM, h):
     t = (w[:, 0] * d[i, 1] - w[:, 1] * d[i, 0]) / den
   x = (s > 0) & (s < 1) & (t > 0) & (t < 1) & ~np.any((e[i] == e[j, 0][:, None]) | (e[i] == e[j, 1][:, None]), axis=1)
   isX[i[x]] = True
-  return isX
+  return isX, None
 
 
 __all__ = []

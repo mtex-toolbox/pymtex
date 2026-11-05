@@ -1489,6 +1489,9 @@ def _sweepLoop(em, V0, V, dxy, p0, Minv, M, fill, lo0, lo1, tol, out):
 # and the list
 def _segmentGrid(a, b, sel, x0, y0, h, nx, ny):
   near = np.zeros(nx * ny, np.bool_)
+  if sel.shape[0] == a.shape[0]:
+    near[:] = True
+    sel = sel[:0]
   for s in sel:
     for i in range(int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h) + 1):
       for j in range(int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h) + 1):
@@ -1544,39 +1547,40 @@ def segmentGridNumba(a, b, sel, h):
   return x0, y0, ny, start, items
 
 
-# whether each segment q of the grid crosses another one properly, without a common vertex
-def _crossingLoop(a, b, e, q, x0, y0, h, ny, start, items, out):
+# whether segment s, from W[e[s, 0]] to W[e[s, 1]], properly crosses one of the segments listed in
+# the cells of the grid (x0, y0, h, ny, start, items) its box meets, without a common vertex
+def _gridCross(W, e, s, x0, y0, h, ny, start, items):
+  nx = (start.shape[0] - 1) // ny
+  ax, ay, bx, by = W[e[s, 0], 0], W[e[s, 0], 1], W[e[s, 1], 0], W[e[s, 1], 1]
+  dx, dy = bx - ax, by - ay
+  for i in range(max(0, int((min(ax, bx) - x0) / h)), min(nx, int((max(ax, bx) - x0) / h) + 1)):
+    for j in range(max(0, int((min(ay, by) - y0) / h)), min(ny, int((max(ay, by) - y0) / h) + 1)):
+      c = i * ny + j
+      for m in range(start[c], start[c + 1]):
+        r = items[m]
+        if e[r, 0] == e[s, 0] or e[r, 0] == e[s, 1] or e[r, 1] == e[s, 0] or e[r, 1] == e[s, 1]:
+          continue
+        ex, ey = W[e[r, 1], 0] - W[e[r, 0], 0], W[e[r, 1], 1] - W[e[r, 0], 1]
+        den = dx * ey - dy * ex
+        if den == 0:
+          continue
+        wx, wy = W[e[r, 0], 0] - ax, W[e[r, 0], 1] - ay
+        u = (wx * ey - wy * ex) / den
+        v = (wx * dy - wy * dx) / den
+        if 0 < u < 1 and 0 < v < 1:
+          return True
+  return False
+
+
+# whether each segment q crosses another one, the candidates the segments of the first grid,
+# listed where they were when it was built, and those of the second, the segments moved since
+def _crossingLoop(W, e, q, x0, y0, h, ny, start, items, x1, y1, ny1, start1, items1, out):
   for k in prange(q.shape[0]):
     s = q[k]
-    dx, dy = b[s, 0] - a[s, 0], b[s, 1] - a[s, 1]
-    i0, i1 = int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h)
-    j0, j1 = int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h)
-    hit = False
-    for i in range(i0, i1 + 1):
-      for j in range(j0, j1 + 1):
-        c = i * ny + j
-        for m in range(start[c], start[c + 1]):
-          r = items[m]
-          if e[r, 0] == e[s, 0] or e[r, 0] == e[s, 1] or e[r, 1] == e[s, 0] or e[r, 1] == e[s, 1]:
-            continue
-          ex, ey = b[r, 0] - a[r, 0], b[r, 1] - a[r, 1]
-          den = dx * ey - dy * ex
-          if den == 0:
-            continue
-          wx, wy = a[r, 0] - a[s, 0], a[r, 1] - a[s, 1]
-          u = (wx * ey - wy * ex) / den
-          v = (wx * dy - wy * dx) / den
-          if 0 < u < 1 and 0 < v < 1:
-            hit = True
-            break
-        if hit:
-          break
-      if hit:
-        break
-    out[s] = hit
+    out[s] = _gridCross(W, e, s, x0, y0, h, ny, start, items) or _gridCross(W, e, s, x1, y1, h, ny1, start1, items1)
 
 
-_PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+_PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_gridCross", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
