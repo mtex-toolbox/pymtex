@@ -271,16 +271,16 @@ def test_the_default_reconstruction_of_csl_is_matlabs():
 
 @pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
 def test_no_indexed_grain_below_minPixel_survives_the_second_pass():
-  # the second segmentation cut a 239 pixel grain of small into a one pixel fragment; it
-  # becomes not indexed where it lies, as MATLAB's enforceMinPixel, on a turned map as well
+  # the second segmentation cuts a 239 pixel grain of small into a one pixel fragment; the cull
+  # repeats the decomposition, which takes its pixels as any notIndexed ones, so no notIndexed
+  # grain borders the outside, on a turned map as well (MATLAB develop a6c36f618)
   from mtex import mtexdata
   ebsd = mtexdata("small", root=LOCAL, download=False)
   for e in (ebsd.copy(), ebsd.copy().rotate(rotation.byAxisAngle(zvector, 30 * degree))):
     g = calcGrains(e, angle=15 * degree, minPixel=3)
     assert not np.any(g.isIndexed & (g.numPixel < 3))
-    frag = ~np.asarray(g.isIndexed).reshape(-1) & (np.asarray(g.numPixel).reshape(-1) < 3)
-    assert frag.any() and np.all(np.isnan(g.meanRotation.data.reshape(-1, 4)[frag, 0]))
-    assert np.all(~e.isIndexed.reshape(-1)[np.isin(e.grainId.reshape(-1), g.id[frag])])
+    b = g.boundary
+    assert not np.any(np.isin(b.grainId, g.id[~np.asarray(g.isIndexed)]).any(axis=1) & (b.grainId == 0).any(axis=1))
 
 
 def test_the_grain_loops_follow_the_kernels_preference():
