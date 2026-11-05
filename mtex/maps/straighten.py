@@ -54,18 +54,22 @@ def straightenInFill(c, seg):
   vB, e = np.unique(F[isB], return_inverse=True)
   e = e.reshape(-1, 2).astype(np.int64)
   from scipy.sparse import coo_matrix, diags
+  from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
   A = coo_matrix((np.ones(2 * len(e)), (e.reshape(-1), e[:, ::-1].reshape(-1))), shape=(len(vB), len(vB))).tocsr()
   deg = np.asarray(A.sum(axis=1)).reshape(-1)
   W0 = V[vB]
   isFixed = inFill(W0) <= tol
-  Wlast = W0
+  # every round solves only the chains a vertex held in the last one belongs to
+  solve, lab, W = ~isFixed, np.full(len(vB), -1), W0
   while True:
-    W = W0.copy()
-    mi, fi = np.flatnonzero(~isFixed), np.flatnonzero(isFixed)
-    Am = A[mi]
+    Wlast, W = W, W.copy()
+    W[isFixed] = W0[isFixed]
+    mi, fi = np.flatnonzero(solve & ~isFixed), np.flatnonzero(isFixed)
     if len(mi):
+      Am = A[mi]
       W[mi] = spsolve((diags(deg[mi] + 1e-3) - Am[:, mi]).tocsc(), Am[:, fi] @ W0[fi] + 1e-3 * W0[mi]).reshape(-1, 2)
+      lab[mi] = connected_components(Am[:, mi], directed=False)[1] + lab.max() + 1
 
     # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
     isM = np.any(W != Wlast, axis=1)[e].any(axis=1)
@@ -73,8 +77,9 @@ def straightenInFill(c, seg):
     bad[isM] |= sweepsOut(W0, W, e[isM], dxy, inFill, tol)
     if not bad.any():
       break
-    isFixed[e[bad].reshape(-1)] = True
-    Wlast = W
+    v = e[bad].reshape(-1)
+    solve = np.isin(lab, lab[v])
+    isFixed[v] = True
   V0, V = V, V.copy()
   V[vB] = W
   ix = np.concatenate([np.arange(len(c.F)), cut])
