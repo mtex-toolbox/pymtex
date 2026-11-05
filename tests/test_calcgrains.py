@@ -302,3 +302,31 @@ def test_undersized_marks_the_indexed_pixels_of_small_grains():
 def test_a_zero_row_stays_zero_when_the_rows_are_normalised():
   from mtex.maps.calcgrains import _normalizeRows
   assert np.array_equal(_normalizeRows(np.array([[0.0, 0, 0, 0], [0, 3, 0, 4]])), [[0, 0, 0, 0], [0, 0.6, 0, 0.8]])
+
+
+@pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
+@pytest.mark.parametrize("alpha", (1.1, 2.1))
+def test_no_two_cells_touch_in_a_single_point_of_the_outer_boundary(alpha):
+  # MATLAB develop's splitPinches: after it no vertex joins exactly four faces of a cell with a
+  # measurement, each with the outside on its other side; forsterite has such vertices before
+  from mtex import mtexdata
+  from mtex.maps.decomposition import decompose, splitPinches
+  c = decompose(mtexdata("forsterite", root=LOCAL, download=False), alpha)
+
+  def pinches(c):
+    nC = (c.sites.pixel[c.cells] >= 0).sum(axis=1)
+    count = lambda m: np.bincount(c.F[m].reshape(-1), minlength=len(c.V))
+    return np.sum((count(nC > 0) == 4) & (count(nC == 1) == 4))
+
+  assert pinches(c) > 0 and pinches(splitPinches(c)) == 0
+
+
+def test_a_hole_of_absent_and_measured_pixels_is_one_notIndexed_grain():
+  # MATLAB develop's remapIFD: the absent cells join a measured pixel of their hole, so the hole
+  # borders no void
+  e = blockMap(SQ3, 1, 30, notIndexed=((15, 15, 6.0),))
+  i = np.asarray(e.pos.data).reshape(-1, 3)[:, 0]
+  g = calcGrains(e[e.isIndexed | (i >= 15)], angle=5 * degree)
+  hole = np.flatnonzero(~np.asarray(g.isIndexed))
+  b = g.boundary
+  assert len(hole) == 1 and not np.any((b.grainId == g.id[hole[0]]).any(axis=1) & (b.grainId == 0).any(axis=1))
