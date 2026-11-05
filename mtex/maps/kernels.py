@@ -1303,38 +1303,19 @@ def _expLoop(ref, v, out):
 # nearest to its centre, searched over the lattice cells around the pixel, are the candidates,
 # and the pixel joins the first whose polygon, the segments of grain g at segStart[g] ..
 # segStart[g + 1] - 1 of seg (x1, y1, x2, y2), holds every nudged corner of its footprint
-# strictly, farther than eps from its boundary; a pixel with no cell of mark, the cells a boundary
-# segment touches, within scale index cells per unit of its nearest site and its corner radius rc
-# skips the test; calcgrains.absorbInteriorPixels is the NumPy form
-def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, mark, scale, rc, out):
+# strictly, farther than eps from its boundary; calcgrains.absorbInteriorPixels is the NumPy form
+def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, out):
   n1, n2 = lookup.shape
   for t in prange(len(todo)):
     k = todo[t]
     a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
     px, py = P[k, 0], P[k, 1]
-    bestD, bestG = np.inf, 0
+    bestD = np.inf
     for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
       for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
         s = lookup[a, b]
         if s >= 0 and siteGrain[s] > 0:
-          d = (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2
-          if d < bestD:
-            bestD, bestG = d, siteGrain[s]
-    # no cell a boundary segment touches within the nearest site plus the corners: the disk
-    # holds both, so the pixel lies in the site's grain
-    if bestG > 0 and mark.shape[0] > 0:
-      r = int(np.ceil((np.sqrt(bestD) + rc) * scale)) + 1
-      clear = True
-      for a in range(max(0, a0 - r), min(n1, a0 + r + 1)):
-        for b in range(max(0, b0 - r), min(n2, b0 + r + 1)):
-          if mark[a, b]:
-            clear = False
-            break
-        if not clear:
-          break
-      if clear:
-        out[k] = bestG
-        continue
+          bestD = min(bestD, (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2)
     for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
       for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
         s = lookup[a, b]
@@ -1361,20 +1342,6 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
           break
       if out[k] > 0:
         break
-
-
-# the raster cells, offset (off0, off1), within one cell of the box of every segment (x1, y1, x2, y2)
-# in lattice indices, (p - p0) Minv
-def _markLoop(seg, p0, Minv, off0, off1, mark):
-  n1, n2 = mark.shape
-  for m in prange(seg.shape[0]):
-    i1 = (seg[m, 0] - p0[0]) * Minv[0, 0] + (seg[m, 1] - p0[1]) * Minv[1, 0]
-    j1 = (seg[m, 0] - p0[0]) * Minv[0, 1] + (seg[m, 1] - p0[1]) * Minv[1, 1]
-    i2 = (seg[m, 2] - p0[0]) * Minv[0, 0] + (seg[m, 3] - p0[1]) * Minv[1, 0]
-    j2 = (seg[m, 2] - p0[0]) * Minv[0, 1] + (seg[m, 3] - p0[1]) * Minv[1, 1]
-    for a in range(max(0, int(np.floor(min(i1, i2))) - 1 - off0), min(n1, int(np.ceil(max(i1, i2))) + 2 - off0)):
-      for b in range(max(0, int(np.floor(min(j1, j2))) - 1 - off1), min(n2, int(np.ceil(max(j1, j2))) + 2 - off1)):
-        mark[a, b] = True
 
 
 # the stencil steps from the seeds through the mask cells m, layer by layer up to n: a cell reached
@@ -1674,7 +1641,7 @@ def _extremalWidthLoop(H, offsets, shortest, longest):
 
 _PIXEL_LOOPS = {"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop,
                 "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop,
-                "absorb": _absorbLoop, "mark": _markLoop, "fill": _fillLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
+                "absorb": _absorbLoop, "fill": _fillLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
 
 
 def pixelKernel(name, backend=None):
