@@ -1581,8 +1581,8 @@ def _crossingLoop(W, e, q, x0, y0, h, ny, starts, items, ioff, out):
 # without an anchor drops that term. The matrix M is symmetric in CSC (indptr, indices, data)
 # with the diagonal among the entries; the loop emits the reduced equations of the anchors as
 # triplets (I, J, val) over the vertex numbers with their right hand sides, and the chains in
-# prv, last, chA, chB for the back substitution
-def _chainEliminateLoop(indptr, indices, data, b, isAnchor, p, q, r, prv, last, chA, chB, I, J, val, rhs):
+# prv, first, last, chA, chB for the back substitution, with the chain of every vertex (-1 at an anchor)
+def _chainEliminateLoop(indptr, indices, data, b, isAnchor, p, q, r, prv, first, last, chA, chB, chain, I, J, val, rhs):
   n = indptr.shape[0] - 1
   seen = np.zeros(n, np.bool_)
   nc = 0
@@ -1622,9 +1622,11 @@ def _chainEliminateLoop(indptr, indices, data, b, isAnchor, p, q, r, prv, last, 
         # forward from A: p, q, r of every vertex
         pp0, pp1, qq, rr = 0.0, 0.0, 0.0, 1.0 if A >= 0 else 0.0
         prev, B = A, -1
+        first[nc] = v
         while True:
           seen[v] = True
           prv[v] = prev
+          chain[v] = nc
           d, nxt, mn = 0.0, -1, 0.0
           for m2 in range(indptr[v], indptr[v + 1]):
             j = indices[m2]
@@ -1706,9 +1708,11 @@ def _chainBackLoop(prv, last, chA, chB, p, q, r, isAnchor, x):
       v = prv[v]
 
 
-def chainSolveNumba(M, b, backend=None):
+def chainSolveNumba(M, b, backend=None, chains=False):
   """the solution of the symmetric system M x = b of straightenInFill with its chains eliminated,
-  the anchors solved by spsolve; None without the compiled loops"""
+  the anchors solved by spsolve, with chains=True also the chain of every unknown (-1 at an
+  anchor), the previous vertex of each, and the first and last vertex of every chain; None
+  without the compiled loops"""
   if not _useNumba(backend):
     return None
   _preparePixel()
@@ -1719,11 +1723,11 @@ def chainSolveNumba(M, b, backend=None):
   n = M.shape[0]
   b = np.ascontiguousarray(b, dtype=float).reshape(n, 2)
   isAnchor, p, q, r = np.zeros(n, np.bool_), np.zeros((n, 2)), np.zeros(n), np.zeros(n)
-  prv, last, chA, chB = np.full(n, -1, np.int64), np.empty(n, np.int64), np.empty(n, np.int64), np.empty(n, np.int64)
+  prv, first, last, chA, chB, chain = np.full(n, -1, np.int64), np.empty(n, np.int64), np.empty(n, np.int64), np.empty(n, np.int64), np.empty(n, np.int64), np.full(n, -1, np.int64)
   cap = 4 * n + M.nnz
   I, J, val, rhs = np.empty(cap, np.int64), np.empty(cap, np.int64), np.empty(cap), np.zeros((n, 2))
   nc, t = _COMPILED["_chainEliminateLoop"](M.indptr.astype(np.int64), M.indices.astype(np.int64), M.data.astype(float), b,
-                                           isAnchor, p, q, r, prv, last, chA, chB, I, J, val, rhs)
+                                           isAnchor, p, q, r, prv, first, last, chA, chB, chain, I, J, val, rhs)
   x = np.zeros((n, 2))
   a = np.flatnonzero(isAnchor)
   if len(a):
@@ -1731,7 +1735,39 @@ def chainSolveNumba(M, b, backend=None):
     R = coo_matrix((val[:t], (ra[I[:t]], ra[J[:t]])), shape=(len(a), len(a))).tocsc()
     x[a] = spsolve(R, rhs[a]).reshape(-1, 2)
   _COMPILED["_chainBackLoop"](prv, last[:nc], chA[:nc], chB[:nc], p, q, r, isAnchor, x)
-  return x
+  return (x, chain, prv, first[:nc], last[:nc]) if chains else x
+
+
+# the vertex of every chain cs whose old position W0 lies farthest from the chord through the
+# solved positions W of the chain's first and last vertex, the vertices numbered by mi
+def _farthestLoop(cs, first, last, prv, mi, W, W0, out):
+  for k in prange(cs.shape[0]):
+    c = cs[k]
+    v1, v = first[c], last[c]
+    px, py = W[mi[v1], 0], W[mi[v1], 1]
+    dx, dy = W[mi[v], 0] - px, W[mi[v], 1] - py
+    L = np.sqrt(dx * dx + dy * dy)
+    best, dmax = v, -1.0
+    while True:
+      wx, wy = W0[mi[v], 0] - px, W0[mi[v], 1] - py
+      d = abs(dx * wy - dy * wx) / L if L > 0 else np.sqrt(wx * wx + wy * wy)
+      if d > dmax:
+        best, dmax = v, d
+      if v == v1:
+        break
+      v = prv[v]
+    out[k] = mi[best]
+
+
+def farthestOfChainsNumba(cs, first, last, prv, mi, W, W0):
+  """the vertex of every chain cs whose old position lies farthest from the chord through the
+  solved positions of the chain's ends; None without the compiled loops"""
+  loop = _pixelLoop(_farthestLoop, True)
+  if loop is None:
+    return None
+  out = np.empty(len(cs), np.int64)
+  loop(np.ascontiguousarray(cs, dtype=np.int64), first, last, prv, np.ascontiguousarray(mi, dtype=np.int64), np.ascontiguousarray(W), np.ascontiguousarray(W0), out)
+  return out
 
 
 _PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",

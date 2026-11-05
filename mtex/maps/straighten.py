@@ -15,8 +15,14 @@ from __future__ import annotations
 import numpy as np
 
 from .decomposition import cellComplex
-from .kernels import adjacencyNumba, chainSolveNumba, pixelKernel, segmentGridNumba
+from .kernels import adjacencyNumba, chainSolveNumba, farthestOfChainsNumba, pixelKernel, segmentGridNumba
 from .segment import segmentation
+
+# the pinning rule under study: True holds, of a chain of free vertices with a segment that
+# sweeps out of the fill or crosses, only the vertex farthest from the chord between its ends,
+# as Douglas-Peucker, instead of both ends of every such segment; it changes the result and
+# leaves the parity with MATLAB develop, so it stays off
+PIN_FARTHEST = False
 
 
 def straightenInFill(c, seg):
@@ -73,7 +79,7 @@ def straightenInFill(c, seg):
   isFixed = dV[vB] <= tol
   # every round solves only the chains a vertex held in the last one belongs to, and samples and
   # tests the segments that moved
-  W, mi, reset, lab, loc, grids = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), []
+  W, mi, reset, lab, loc, grids, chains = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), [], None
   # the solve keeps every vertex in the hull of the held ones, so the box of W0 holds every round
   box = W0.T.min(axis=1), W0.T.max(axis=1)
   while True:
@@ -83,18 +89,20 @@ def straightenInFill(c, seg):
       # (D + 1e-3) W - A W = A W0 over the held neighbours + 1e-3 W0, the free vertices in their order
       n = len(mi)
       rows, j = np.repeat(np.arange(n), deg[mi]), nbr[_ranges(ptr, mi)]
+      loc[:] = -1
       loc[mi] = np.arange(n)
       lj = loc[j]
-      loc[mi] = -1
       ff, fx = lj >= 0, isFixed[j]
       M = coo_matrix((np.concatenate([deg[mi] + 1e-3, -np.ones(ff.sum())]), (np.concatenate([np.arange(n), rows[ff]]),
                       np.concatenate([np.arange(n), lj[ff]]))), shape=(n, n)).tocsc()
       key, cnt = np.unique(rows[fx].astype(np.int64) * nB + j[fx], return_counts=True)
       r, col = key // nB, key % nB
       rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
-      Wm = chainSolveNumba(M, rhs)
+      Wm = chainSolveNumba(M, rhs, chains=PIN_FARTHEST)
       if Wm is None:
         Wm = spsolve(M, rhs).reshape(-1, 2)
+      elif PIN_FARTHEST:
+        Wm, chains = Wm[0], Wm[1:]
       moved.append(mi[(Wm[:, 0] != W[mi, 0]) | (Wm[:, 1] != W[mi, 1])])
       W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
@@ -111,6 +119,8 @@ def straightenInFill(c, seg):
     if not bad.any():
       break
     v = e[bad].reshape(-1)
+    if chains is not None:
+      v = pinFarthest(e[bad], chains, loc, mi, W, W0)
     held = np.zeros(nB, dtype=bool)
     held[v[~isFixed[v]]] = True
     reset = np.flatnonzero(held)
@@ -123,6 +133,18 @@ def straightenInFill(c, seg):
   split = lambda x: np.concatenate([x, x[cut]])
   return (cellComplex(V.astype(c.V.dtype, copy=False), F.astype(c.F.dtype, copy=False), cells, c.sites, c.A, c.plane, c.shape, V0.astype(c.V.dtype, copy=False)),
           segmentation(grainId, seg.nGrains, split(seg.connect), split(seg.isInner), split(seg.isOuter)))
+
+
+def pinFarthest(eb, chains, loc, mi, W, W0):
+  """the vertices to hold for the bad segments eb under PIN_FARTHEST: of every chain one of them
+  touches, the vertex whose old position lies farthest from the chord through the solved ends,
+  and both ends of a segment that touches no chain"""
+  chain, prv, first, last = chains
+  l = loc[eb]
+  c = np.where(l >= 0, chain[np.maximum(l, 0)], -1)
+  cs = np.unique(c[c >= 0])
+  v = farthestOfChainsNumba(cs, first, last, prv, mi, W, W0)
+  return np.concatenate([v, eb[np.all(c < 0, axis=1)].reshape(-1)])
 
 
 def sweepsOut(V0, V, em, dxy, inFill, tol):
