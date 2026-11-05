@@ -45,7 +45,7 @@ function run(n, ng, report)
   g = calcGrains!(e; threshold = 5 * pi / 180)
   kam = KAM(e)
   for (name, f) in [("simplifyBoundary", () -> simplifyBoundary(g)), ("refineBoundary", () -> refineBoundary(g)),
-    ("reduceBoundary", () -> reduceBoundary(g, 2)), ("smoothBoundary laplace 5", () -> smoothBoundary(g, 5)),
+    ("reduceBoundary", () -> reduceBoundary(g, 2)), ("smoothBoundary", () -> smoothBoundary(g)), ("smoothBoundary 5", () -> smoothBoundary(g, 5)),
     ("smoothBoundary curvature", () -> smoothBoundary(g, CurvatureFilter())),
     ("aspectRatio", () -> aspectRatio(g)), ("hull", () -> hull(g)), ("paris", () -> paris(g)),
     ("caliper", () -> caliper(g)), ("caliper shortest", () -> caliper(g, :shortest)), ("paror", () -> paror(g)),

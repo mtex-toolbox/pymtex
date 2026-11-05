@@ -64,7 +64,7 @@ def run(n, ng, report):
   g = calcGrains(e, angle=5 * degree)
   kam = e.KAM()
   for name, f in [("simplifyBoundary", lambda: g.simplifyBoundary()), ("refineBoundary", lambda: g.refineBoundary()),
-                  ("reduceBoundary", lambda: g.reduceBoundary(2)), ("smoothBoundary laplace 5", lambda: g.smoothBoundary(5)),
+                  ("reduceBoundary", lambda: g.reduceBoundary(2)), ("smoothBoundary", lambda: g.smoothBoundary()), ("smoothBoundary 5", lambda: g.smoothBoundary(5)),
                   ("smoothBoundary curvature", lambda: g.smoothBoundary(curvatureFilter())),
                   ("aspectRatio", lambda: g.aspectRatio()), ("hull", lambda: g.hull()), ("paris", lambda: g.paris()),
                   ("caliper", lambda: g.caliper()), ("caliper shortest", lambda: g.caliper("shortest")), ("paror", lambda: g.paror()),

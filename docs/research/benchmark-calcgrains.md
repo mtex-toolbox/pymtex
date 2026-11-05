@@ -166,6 +166,89 @@ The port is now within 1.2 to 1.7 times of Julia on every case and ahead of it o
 at the defaults. What is left is mostly the NumPy glue between the kernels (gathers and
 concatenations of the per-pixel arrays), not one stage.
 
+## MATLAB develop's reconstruction, 2026-11-05
+
+calcGrains follows MATLAB develop at 175d8c803: the boundaries through the cells the closing filled
+drawn straight (`straighten=True`, MATLAB's `'straighten'`, `mtex/maps/straighten.py`), the bay mouth
+reopened only as far as the largest smaller closing leaves it open and repeated while the outside grows
+(`openCorridors`), a vertex where four outer faces meet split (`splitPinches`), the decomposition repeated
+while the minPixel cull re-fragments a grain, the empty cells of a hole joined to its smallest measured
+pixel (`joinHoles`), and the notIndexed pixels absorbed by the grain polygons they lie in. smoothBoundary
+is D6 of the grain reconstruction plan: 20 Taubin pairs with every vertex of a pixel edge held in its
+pixel cell, then the side constrained simplification at d/10.
+
+### Against MATLAB
+
+`bench/calcgrains_ops.py` (the MATLAB half `bench/matlab/bench_calcgrains_ops.m`) on small (10°, minPixel 5),
+peridotite (alpha 2.1, 6.1 and 16.1, minPixel 5), forsterite (minPixel 1 and 5) and the T1 instance with
+cracks; besides it the 21 instances of the T1 quick subset of the grain benchmark, both with and without
+straightening.
+
+- Grain counts, indexed grain counts and boundary segment counts are MATLAB's on every map and setting.
+- Along the bisectors every segment between two grains lies within 1.3e-9 of MATLAB's (coordinates up to
+  3e4 µm). The outer boundary differs only at the map corners, where MATLAB's vertices lie 1e-4 to 7e-4
+  pixels off the lattice; the grain areas differ by that.
+- Straightened, the vertices lie within 2e-3 to 5e-3 µm of MATLAB's (a ten thousandth of a pixel). A cut point is
+  found by 16 bisections; where a midpoint falls exactly on a lattice edge the fill test is zero and
+  rounding decides the side (this port takes a tie as zero, MATLAB its 1e-14 of the affine fit).
+- Where the two ports hold different vertices, the cause is MATLAB's sample count of a swept area,
+  `ceil(3 len / dxy)`, for a segment exactly one pixel long: rounding of `len` gives 3 or 4 samples, and the
+  fourth finds a sliver of a measured cell the third misses. On forsterite one chain of five segments is
+  held in MATLAB and straight here (32 µm apart), on the hexagonal T1 instance two of 400 segments in the
+  first round, after which 1877 vertices differ by up to 0.22 pixels. A count with a tolerance,
+  `ceil(3 len / dxy - 1e-9)`, would make it deterministic in both ports.
+- The absorbed notIndexed pixels differ in two ways, both MATLAB's: MATLAB counts a nudged corner on a
+  boundary as inside, so it absorbs a pixel a diagonal bisector runs through (forsterite: about 1000
+  pixels it absorbs and this port does not); and it tests only the grain of the one nearest measured pixel, so
+  after straightening a pixel wholly inside the other grain stays at 0 (forsterite: 597 pixels this port
+  absorbs, 199 of the first 200 checked to lie wholly in one of MATLAB's own polygons).
+
+### Time
+
+bayes (16 cores, at a load of 11 to 13 from other users), 4 threads, best of five (1C_1 of three), the map copied
+outside the clock. main is pymtex main, before the closing classification of MATLAB develop; base the
+branch this work started from (the closing, dd94245c0's corridor rule, D6 smoothing); port the first
+commit of the MATLAB develop port with the straightening in NumPy; now its compiled form.
+
+| map | setting | calcGrains main | base | port | now | smoothBoundary main | base | now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| small | 10°, minPixel 5 | 0.024 | 0.025 | 0.042 | 0.030 | 0.002 | 0.005 | 0.002 |
+| peridotite | alpha 2.1, minPixel 5 | 0.213 | 0.220 | 0.582 | 0.360 | 0.024 | 0.108 | 0.032 |
+| peridotite | alpha 6.1, minPixel 5 | 0.240 | 0.290 | 0.706 | 0.424 | 0.020 | 0.080 | 0.029 |
+| peridotite | alpha 16.1, minPixel 5 | 0.672 | 0.722 | 1.183 | 0.849 | 0.017 | 0.077 | 0.027 |
+| forsterite | defaults | 0.189 | 0.199 | 1.057 | 0.381 | 0.043 | 0.170 | 0.062 |
+| forsterite | minPixel 5 | 0.331 | 0.385 | 1.378 | 0.741 | 0.033 | 0.151 | 0.042 |
+| 1C_1 | 10° | 2.63 | 3.13 | 30.9 | 6.51 | 1.71 | 6.85 | 2.57 |
+
+main's smoothBoundary is the Laplacian one before D6, main's calcGrains gives other grain counts (665 for
+609 on peridotite alpha 2.1, 3120 for 3104 on forsterite, 118 930 for 118 899 on 1C_1). On the laptop of
+the first section, MATLAB R2024b (the bridge, 2 threads) and Julia (12 threads):
+
+| map | setting | MATLAB calcGrains | MATLAB smoothBoundary | Julia calcGrains (closing branch, bisectors) | Julia smoothBoundary (D6 branch) |
+|---|---|---:|---:|---:|---:|
+| small | 10°, minPixel 5 | 0.067 | | | |
+| peridotite | alpha 2.1 / 6.1 / 16.1, minPixel 5 | 1.15 / 2.07 / 2.37 | | | |
+| forsterite | defaults / minPixel 5 | 2.45 / 4.21 | | 0.41 / 0.59 | 0.083 / 0.061 |
+| 1C_1 | 10° | 42.7 (12.8 with `'straighten', false`) | 21.4 | 4.03 | 2.52 |
+
+Where the time went, 1C_1 on bayes (cProfile, cumulative):
+
+| stage | port | now | what changed |
+|---|---:|---:|---|
+| straightenInFill | 26.5 s | 2.4 s | the stages below |
+| its crossing test, 5 rounds | 12.9 s | 0.6 s | every segment in the cells of a pixel grid its box meets, the grid around the moved segments only, compiled; a grid as large as the longest segment held thousands of segments per cell |
+| its fill test, 24 calls | 7.9 s | < 0.1 s | the four lattice points around a point in one compiled loop, on the lattice's own origin and basis |
+| its samples of the swept areas and the NumPy between | 3.4 s | 0.5 s | generated and tested in one compiled loop with their counts, stopping at the first sample outside |
+| its solve, 5 rounds | 0.76 s | 0.45 s | over the boundary vertices alone, after the first round over the chains a held vertex belongs to |
+| buildSites | 0.89 s | 0.57 s | the corridor distances one compiled loop, the hull of the first and last cell of every row |
+| smoothBoundary's Taubin pairs | 5.1 s | 0.5 s | the 40 steps and the projection into the pixel cells one compiled loop, the sparse product's sums in its order |
+
+Every step but the solve's gives the vertices and the grain ids of the step before to the bit; the solve
+moves them by rounding (at most 2e-11 µm). Against base, what 1C_1 still spends is the straightening
+(2.4 s), half of it the five rounds of solve and crossing test, and the absorption's polygon test
+(0.8 s, 0.2 s before), which a pixel far from every boundary could skip: a shortcut through a segment
+grid did, and cost more to build than it saved.
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three
@@ -191,4 +274,12 @@ julia -t auto --project=../mtexJulia/dev bench/calcgrains.jl
 .venv/bin/python bench/calcgrains.py compare
 ```
 
-The export, the per-port counts and the partitions go to `bench/out/calcgrains/`.
+The export, the per-port counts and the partitions go to `bench/out/calcgrains/`. The cross-check
+against MATLAB develop:
+
+```
+.venv/bin/python bench/calcgrains_ops.py export     # the T1 crack instance of the grain benchmark
+.venv/bin/python bench/calcgrains_ops.py run
+.venv/bin/python bench/calcgrains_ops.py matlab     # bench/matlab/bench_calcgrains_ops.m through the bridge
+.venv/bin/python bench/calcgrains_ops.py compare
+```
