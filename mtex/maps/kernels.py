@@ -1300,22 +1300,49 @@ def _expLoop(ref, v, out):
 # ------------------------------------------------------------------ the compilation of these
 
 # the grain of every pixel the closing left without a cell: the grains of the sites with a grain
-# nearest to its centre, searched over the lattice cells around the pixel, are the candidates,
-# and the pixel joins the first whose polygon, the segments of grain g at segStart[g] ..
-# segStart[g + 1] - 1 of seg (x1, y1, x2, y2), holds every nudged corner of its footprint
-# strictly, farther than eps from its boundary; calcgrains.absorbInteriorPixels is the NumPy form
-def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, out):
+# nearest to its centre, searched over the lattice cells around the pixel, are the candidates.
+# Where no boundary segment, listed by the cells of the grid (x0, y0, h, ny, gstart, gitems), comes
+# closer to the centre than that site plus rc, the corner radius, the disk holds the site and the
+# footprint and the pixel joins the site's grain; otherwise it joins the first candidate whose
+# polygon, the segments of grain g at segStart[g] .. segStart[g + 1] - 1 of seg (x1, y1, x2, y2),
+# holds every nudged corner of its footprint strictly, farther than eps from its boundary;
+# calcgrains.absorbInteriorPixels is the NumPy form
+def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, seg, eps, rc, allSeg,
+                x0, y0, h, ny, gstart, gitems, out):
   n1, n2 = lookup.shape
+  nx = (gstart.shape[0] - 1) // ny
   for t in prange(len(todo)):
     k = todo[t]
     a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
     px, py = P[k, 0], P[k, 1]
-    bestD = np.inf
+    bestD, bestG = np.inf, 0
     for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
       for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
         s = lookup[a, b]
         if s >= 0 and siteGrain[s] > 0:
-          bestD = min(bestD, (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2)
+          d = (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2
+          if d < bestD:
+            bestD, bestG = d, siteGrain[s]
+    if bestG == 0:
+      continue
+    R = np.sqrt(bestD) + rc
+    near = False
+    for i in range(max(0, int((px - R - x0) / h)), min(nx, int((px + R - x0) / h) + 1)):
+      for j in range(max(0, int((py - R - y0) / h)), min(ny, int((py + R - y0) / h) + 1)):
+        for m in range(gstart[i * ny + j], gstart[i * ny + j + 1]):
+          r = gitems[m]
+          dx, dy = allSeg[r, 2] - allSeg[r, 0], allSeg[r, 3] - allSeg[r, 1]
+          u = min(1.0, max(0.0, ((px - allSeg[r, 0]) * dx + (py - allSeg[r, 1]) * dy) / max(dx * dx + dy * dy, 1e-300)))
+          if (px - allSeg[r, 0] - u * dx) ** 2 + (py - allSeg[r, 1] - u * dy) ** 2 <= (R + eps) * (R + eps):
+            near = True
+            break
+        if near:
+          break
+      if near:
+        break
+    if not near:
+      out[k] = bestG
+      continue
     for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
       for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
         s = lookup[a, b]
