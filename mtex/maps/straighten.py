@@ -106,7 +106,7 @@ def straightenInFill(c, seg):
     q = np.flatnonzero(isM)
     bad = np.zeros(m, dtype=bool)
     bad[q] = sweepsOut(W0, W, e[q], dxy, inFill, tol)
-    isX, grids = crossing(W, e, q[~bad[q]], 4 * dxy, box, grids, q)
+    isX, grids = crossing(W, e, q[~bad[q]], 2 * dxy, box, grids, q)
     bad |= isX
     if not bad.any():
       break
