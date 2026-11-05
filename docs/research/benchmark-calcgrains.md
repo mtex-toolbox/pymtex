@@ -212,13 +212,17 @@ commit of the MATLAB develop port with the straightening in NumPy; now its compi
 
 | map | setting | calcGrains main | base | port | now | smoothBoundary main | base | now |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| small | 10°, minPixel 5 | 0.024 | 0.025 | 0.042 | 0.030 | 0.002 | 0.005 | 0.002 |
-| peridotite | alpha 2.1, minPixel 5 | 0.213 | 0.220 | 0.582 | 0.360 | 0.024 | 0.108 | 0.032 |
-| peridotite | alpha 6.1, minPixel 5 | 0.240 | 0.290 | 0.706 | 0.424 | 0.020 | 0.080 | 0.029 |
-| peridotite | alpha 16.1, minPixel 5 | 0.672 | 0.722 | 1.183 | 0.849 | 0.017 | 0.077 | 0.027 |
-| forsterite | defaults | 0.189 | 0.199 | 1.057 | 0.381 | 0.043 | 0.170 | 0.062 |
-| forsterite | minPixel 5 | 0.331 | 0.385 | 1.378 | 0.741 | 0.033 | 0.151 | 0.042 |
-| 1C_1 | 10° | 2.63 | 3.13 | 30.9 | 6.51 | 1.71 | 6.85 | 2.57 |
+| small | 10°, minPixel 5 | 0.024 | 0.025 | 0.042 | 0.034 | 0.002 | 0.005 | 0.003 |
+| peridotite | alpha 2.1, minPixel 5 | 0.213 | 0.220 | 0.582 | 0.361 | 0.024 | 0.108 | 0.037 |
+| peridotite | alpha 6.1, minPixel 5 | 0.240 | 0.290 | 0.706 | 0.428 | 0.020 | 0.080 | 0.029 |
+| peridotite | alpha 16.1, minPixel 5 | 0.672 | 0.722 | 1.183 | 0.881 | 0.017 | 0.077 | 0.026 |
+| forsterite | defaults | 0.189 | 0.199 | 1.057 | 0.380 | 0.043 | 0.170 | 0.061 |
+| forsterite | minPixel 5 | 0.331 | 0.385 | 1.378 | 0.720 | 0.033 | 0.151 | 0.043 |
+| 1C_1 | 10° | 2.63 | 3.13 | 30.9 | 5.73 | 1.71 | 6.85 | 2.44 |
+
+With `straighten=False` now takes 0.321 s on peridotite alpha 2.1, 0.309 s and 0.687 s on forsterite and 3.79 s on
+1C_1: what is left beyond base there is the absorption by the grain polygons and, with minPixel, the third
+decomposition the loop takes where the cull re-fragments a grain (forsterite minPixel 5, as in MATLAB).
 
 main's smoothBoundary is the Laplacian one before D6, main's calcGrains gives other grain counts (665 for
 609 on peridotite alpha 2.1, 3120 for 3104 on forsterite, 118 930 for 118 899 on 1C_1). On the laptop of
@@ -235,19 +239,20 @@ Where the time went, 1C_1 on bayes (cProfile, cumulative):
 
 | stage | port | now | what changed |
 |---|---:|---:|---|
-| straightenInFill | 26.5 s | 2.4 s | the stages below |
-| its crossing test, 5 rounds | 12.9 s | 0.6 s | every segment in the cells of a pixel grid its box meets, the grid around the moved segments only, compiled; a grid as large as the longest segment held thousands of segments per cell |
+| straightenInFill | 26.5 s | 1.9 s | the stages below |
+| its crossing test, 5 rounds | 12.9 s | 0.35 s | every segment in the cells of a grid of four pixels its box meets, compiled, the grid built once with a second one of the segments moved since; a grid as large as the longest segment held thousands of segments per cell |
 | its fill test, 24 calls | 7.9 s | < 0.1 s | the four lattice points around a point in one compiled loop, on the lattice's own origin and basis |
 | its samples of the swept areas and the NumPy between | 3.4 s | 0.5 s | generated and tested in one compiled loop with their counts, stopping at the first sample outside |
-| its solve, 5 rounds | 0.76 s | 0.45 s | over the boundary vertices alone, after the first round over the chains a held vertex belongs to |
+| its solve, 5 rounds | 0.76 s | 0.5 s | over the boundary vertices alone, after the first round over the chains a held vertex belongs to, the system assembled from the half edges |
 | buildSites | 0.89 s | 0.57 s | the corridor distances one compiled loop, the hull of the first and last cell of every row |
 | smoothBoundary's Taubin pairs | 5.1 s | 0.5 s | the 40 steps and the projection into the pixel cells one compiled loop, the sparse product's sums in its order |
 
 Every step but the solve's gives the vertices and the grain ids of the step before to the bit; the solve
 moves them by rounding (at most 2e-11 µm). Against base, what 1C_1 still spends is the straightening
-(2.4 s), half of it the five rounds of solve and crossing test, and the absorption's polygon test
-(0.8 s, 0.2 s before), which a pixel far from every boundary could skip: a shortcut through a segment
-grid did, and cost more to build than it saved.
+(1.9 s, a quarter of it the first round's solve over 515 000 free vertices, the rest the crossing test and
+the samples of 760 000 moved segments and the setup around them) and the absorption's polygon test
+(0.7 s, 0.24 s before). A raster of the cells boundary segments touch, to let a pixel far from them skip the
+polygon test, cost more to build than it saved on 1C_1's small grains.
 
 ## MATLAB defects found on the way
 
