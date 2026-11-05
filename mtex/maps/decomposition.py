@@ -18,7 +18,7 @@ import warnings
 
 import numpy as np
 
-from .kernels import localVoronoiNumba, weldNumba
+from .kernels import localVoronoiNumba, pixelKernel, weldNumba
 from .lattice import STENCIL, cellCorners
 from .polygon import clipHalfPlane, seedBox, voronoiCell
 from ..geometry.display import aligned
@@ -338,7 +338,8 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
 
 class fillDistance:
   """where a point lies to the cells the closing filled: the distance to the nearest other cell
-  centre minus the one to the nearest filled, positive inside them. On a rigid lattice both are
+  centre minus the one to the nearest filled, positive inside them, 0 where the two tie to
+  rounding. On a rigid lattice both are
   among the four lattice points around the point, on a distorted one they are searched among the
   filled cells and the others within two cells of them"""
 
@@ -349,27 +350,42 @@ class fillDistance:
     dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
     self.rigid = np.mean(np.linalg.norm(P - X @ fit, axis=1)) / dxy < 1e-2
     self.p0, self.M = fit[0], fit[1:]
+    self.Minv = np.linalg.inv(self.M)
     if not self.rigid:
       from scipy.spatial import cKDTree
       ring = dilate(dilate(fill, stencil), stencil) & ~fill
       self.F, self.O = (cKDTree(cellPos(np.flatnonzero(m))[0].astype(float)) for m in (fill, ring))
 
-  def __call__(self, p):
-    p = np.asarray(p, dtype=float).reshape(-1, 2)
+  @property
+  def lattice(self):
+    """the arguments of the compiled fill test of a rigid lattice: p0, its inverse basis, the basis,
+    the raster and its offset"""
+    return self.p0, self.Minv, self.M, self.fill, int(self.lo[0]), int(self.lo[1])
+
+  def __call__(self, p, backend=None):
+    p = np.ascontiguousarray(np.asarray(p, dtype=float).reshape(-1, 2))
     if not self.rigid:
       return self.O.query(p)[0] - self.F.query(p)[0]
-    c = np.floor(np.linalg.solve(self.M.T, (p - self.p0).T).T)
+    out = np.empty(len(p))
+    # the points in one compiled loop, the NumPy form below as fallback and oracle
+    loop = pixelKernel("fill", backend)
+    if loop is not None:
+      loop(p, *self.lattice, out)
+      return out
+    u = p - self.p0
+    c = np.floor(u @ self.Minv)
     dF, dO = np.full(len(p), np.inf), np.full(len(p), np.inf)
     for k in ((0, 0), (1, 0), (0, 1), (1, 1)):
       IJ = c + k
-      dist = np.linalg.norm(p - self.p0 - IJ @ self.M, axis=1)
+      dist = np.linalg.norm(u - IJ @ self.M, axis=1)
       rc = (IJ - self.lo).astype(np.int64)
       inR = np.all((rc >= 0) & (rc < self.fill.shape), axis=1)
       isF = np.zeros(len(p), dtype=bool)
       isF[inR] = self.fill[rc[inR, 0], rc[inR, 1]]
       dF[isF] = np.minimum(dF[isF], dist[isF])
       dO[~isF] = np.minimum(dO[~isF], dist[~isF])
-    return dO - dF
+    with np.errstate(invalid="ignore"):
+      return np.where((np.abs(dO - dF) <= 1e-12 * (dO + dF)) & np.isfinite(dO - dF), 0.0, dO - dF)
 
 
 # ------------------------------------------------------------------ the local Voronoi

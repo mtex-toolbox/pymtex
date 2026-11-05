@@ -15,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .decomposition import cellComplex
+from .kernels import pixelKernel, segmentGridNumba
 from .segment import segmentation
 
 
@@ -49,57 +50,75 @@ def straightenInFill(c, seg):
   cells = np.vstack([cells, cells[cut]])
   isB = np.concatenate([isB, np.ones(len(cut), dtype=bool)])
 
-  e = F[isB].astype(np.int64)
-  from scipy.sparse import coo_matrix
+  # the boundary vertices alone, numbered from 0 in e
+  vB, e = np.unique(F[isB], return_inverse=True)
+  e = e.reshape(-1, 2).astype(np.int64)
+  from scipy.sparse import coo_matrix, diags
   from scipy.sparse.linalg import spsolve
-  A = coo_matrix((np.ones(2 * len(e)), (e.reshape(-1), e[:, ::-1].reshape(-1))), shape=(len(V), len(V))).tocsr()
+  A = coo_matrix((np.ones(2 * len(e)), (e.reshape(-1), e[:, ::-1].reshape(-1))), shape=(len(vB), len(vB))).tocsr()
   deg = np.asarray(A.sum(axis=1)).reshape(-1)
-  isFixed = np.ones(len(V), dtype=bool)
-  vB = np.unique(e)
-  isFixed[vB] = inFill(V[vB]) <= tol
-  V0, Vlast = V, V
+  W0 = V[vB]
+  isFixed = inFill(W0) <= tol
+  Wlast = W0
   while True:
-    V = V0.copy()
-    m = ~isFixed & (deg > 0)
-    mi, fi = np.flatnonzero(m), np.flatnonzero(~m)
-    Amm = A[mi][:, mi]
-    L = (coo_matrix((deg[mi] + 1e-3, (np.arange(len(mi)), np.arange(len(mi)))), shape=Amm.shape) - Amm).tocsc()
-    V[mi] = spsolve(L, A[mi][:, fi] @ V0[fi] + 1e-3 * V0[mi]).reshape(-1, 2) if len(mi) else V[mi]
+    W = W0.copy()
+    mi, fi = np.flatnonzero(~isFixed), np.flatnonzero(isFixed)
+    Am = A[mi]
+    if len(mi):
+      W[mi] = spsolve((diags(deg[mi] + 1e-3) - Am[:, mi]).tocsc(), Am[:, fi] @ W0[fi] + 1e-3 * W0[mi]).reshape(-1, 2)
 
     # samples, a third of a pixel apart, of the area every segment sweeps that moved since the last round
-    chg = np.any(V != Vlast, axis=1)
-    isM = chg[e].any(axis=1)
+    isM = np.any(W != Wlast, axis=1)[e].any(axis=1)
     em = e[isM]
-    dV = np.linalg.norm(V - V0, axis=1)
-    T = np.maximum(1, np.ceil(3 * np.maximum(np.linalg.norm(V0[em[:, 1]] - V0[em[:, 0]], axis=1),
-                                             np.linalg.norm(V[em[:, 1]] - V[em[:, 0]], axis=1)) / dxy)).astype(np.int64)
+    dV = np.linalg.norm(W - W0, axis=1)
+    T = np.maximum(1, np.ceil(3 * np.maximum(np.linalg.norm(W0[em[:, 1]] - W0[em[:, 0]], axis=1),
+                                             np.linalg.norm(W[em[:, 1]] - W[em[:, 0]], axis=1)) / dxy)).astype(np.int64)
     K = np.maximum(1, np.ceil(3 * dV[em].max(axis=1, initial=0) / dxy)).astype(np.int64)
-    n = (T + 1) * (K + 1)
-    sid = np.repeat(np.arange(len(em)), n)
-    r = np.arange(len(sid)) - np.repeat(np.cumsum(n) - n, n)
-    t = (r % (T[sid] + 1) / T[sid])[:, None]
-    l = (r // (T[sid] + 1) / K[sid])[:, None]
-    P = (1 - l) * ((1 - t) * V0[em[sid, 0]] + t * V0[em[sid, 1]]) + l * ((1 - t) * V[em[sid, 0]] + t * V[em[sid, 1]])
-    bad = crossing(V, e, isM)
-    bad[isM] |= np.bincount(sid, weights=inFill(P) < -tol, minlength=len(em)) > 0
+    bad = crossing(W, e, isM, dxy)
+    bad[isM] |= sweepsOut(W0, W, em, T, K, inFill, tol)
     if not bad.any():
       break
     isFixed[e[bad].reshape(-1)] = True
-    Vlast = V
+    Wlast = W
+  V0, V = V, V.copy()
+  V[vB] = W
   ix = np.concatenate([np.arange(len(c.F)), cut])
   return (cellComplex(V.astype(c.V.dtype), F.astype(c.F.dtype), cells, c.sites, c.A, c.plane, c.shape, V0.astype(c.V.dtype)),
           segmentation(grainId, seg.nGrains, seg.connect[ix], seg.isInner[ix], seg.isOuter[ix]))
 
 
-def crossing(V, e, isM):
-  """the segments of e with isM that cross another one of e properly, without a common vertex"""
+def sweepsOut(V0, V, em, T, K, inFill, tol):
+  """whether the area each segment em sweeps from V0 to V leaves the fill by more than tol, at
+  (T + 1) x (K + 1) samples along and across it; compiled on a rigid lattice, sampled in NumPy
+  otherwise and as the oracle"""
+  out = np.zeros(len(em), dtype=bool)
+  loop = pixelKernel("sweep") if inFill.rigid else None
+  if loop is not None:
+    loop(np.ascontiguousarray(em), np.ascontiguousarray(V0), np.ascontiguousarray(V), T, K, *inFill.lattice, tol, out)
+    return out
+  n = (T + 1) * (K + 1)
+  sid = np.repeat(np.arange(len(em)), n)
+  r = np.arange(len(sid)) - np.repeat(np.cumsum(n) - n, n)
+  t = (r % (T[sid] + 1) / T[sid])[:, None]
+  l = (r // (T[sid] + 1) / K[sid])[:, None]
+  P = (1 - l) * ((1 - t) * V0[em[sid, 0]] + t * V0[em[sid, 1]]) + l * ((1 - t) * V[em[sid, 0]] + t * V[em[sid, 1]])
+  return np.bincount(sid, weights=inFill(P) < -tol, minlength=len(em)) > 0
+
+
+def crossing(V, e, isM, h):
+  """the segments of e with isM that cross another one of e properly, without a common vertex:
+  the pairs whose bounding boxes share a cell of a grid of spacing h, compiled, or those whose
+  midpoints lie in neighbouring cells of a grid as large as the longest segment"""
   isX = np.zeros(len(e), dtype=bool)
   q = np.flatnonzero(isM)
   if len(q) == 0:
     return isX
-  # candidates from the 3 x 3 buckets, as large as the longest segment, around the midpoint
-  a = V[e[:, 0]]
-  d = V[e[:, 1]] - a
+  a, b = np.ascontiguousarray(V[e[:, 0]]), np.ascontiguousarray(V[e[:, 1]])
+  grid = segmentGridNumba(a, b, h)
+  if grid is not None:
+    pixelKernel("crossing")(a, b, np.ascontiguousarray(e, dtype=np.int64), q, grid[0], grid[1], h, *grid[2:], isX)
+    return isX
+  d = b - a
   c = np.floor((a + d / 2) / np.linalg.norm(d, axis=1).max()).astype(np.int64)
   c -= c.min(axis=0) - 1
   nx = int(c[:, 0].max()) + 2

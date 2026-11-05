@@ -1344,7 +1344,130 @@ def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, re
         break
 
 
-_PIXEL_HELPERS = ("_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+# ------------------------------------------------------------------ the straightening through the fill
+
+# where the point (x, y) lies to the filled cells of the rigid lattice p0 + (i, j) M, Minv its
+# inverse: the distance to the nearest other of the four lattice points around it minus the one
+# to the nearest filled, +-inf where all four are of one kind, 0 where the two tie to rounding;
+# decomposition.fillDistance is the NumPy form
+def _fillAt(x, y, p0, Minv, M, fill, lo0, lo1):
+  ux, uy = x - p0[0], y - p0[1]
+  ci = np.floor(ux * Minv[0, 0] + uy * Minv[1, 0])
+  cj = np.floor(ux * Minv[0, 1] + uy * Minv[1, 1])
+  dF, dO = np.inf, np.inf
+  for k in range(4):
+    I, J = ci + (k & 1), cj + (k >> 1)
+    dx, dy = ux - (I * M[0, 0] + J * M[1, 0]), uy - (I * M[0, 1] + J * M[1, 1])
+    d = np.sqrt(dx * dx + dy * dy)
+    a, b = int(I) - lo0, int(J) - lo1
+    if 0 <= a < fill.shape[0] and 0 <= b < fill.shape[1] and fill[a, b]:
+      dF = min(dF, d)
+    else:
+      dO = min(dO, d)
+  d = dO - dF
+  return 0.0 if abs(d) <= 1e-12 * (dO + dF) and np.isfinite(d) else d
+
+
+# the fill test at every point
+def _fillLoop(P, p0, Minv, M, fill, lo0, lo1, out):
+  for k in prange(P.shape[0]):
+    out[k] = _fillAt(P[k, 0], P[k, 1], p0, Minv, M, fill, lo0, lo1)
+
+
+# whether the area segment s of em sweeps from V0 to V leaves the fill by more than tol, sampled
+# on the (T + 1) x (K + 1) grid of straightenInFill
+def _sweepLoop(em, V0, V, T, K, p0, Minv, M, fill, lo0, lo1, tol, out):
+  for s in prange(em.shape[0]):
+    a, b = em[s, 0], em[s, 1]
+    hit = False
+    for li in range(K[s] + 1):
+      l = li / K[s]
+      for ti in range(T[s] + 1):
+        t = ti / T[s]
+        x = (1 - l) * ((1 - t) * V0[a, 0] + t * V0[b, 0]) + l * ((1 - t) * V[a, 0] + t * V[b, 0])
+        y = (1 - l) * ((1 - t) * V0[a, 1] + t * V0[b, 1]) + l * ((1 - t) * V[a, 1] + t * V[b, 1])
+        if _fillAt(x, y, p0, Minv, M, fill, lo0, lo1) < -tol:
+          hit = True
+          break
+      if hit:
+        break
+    out[s] = hit
+
+
+# the segments (a, b) listed in every cell of the grid of spacing h from (x0, y0) their bounding
+# box meets: the cells' starts into the list, and the list
+def _segmentGrid(a, b, x0, y0, h, nx, ny):
+  start = np.zeros(nx * ny + 1, np.int64)
+  items = np.empty(0, np.int64)
+  for p in range(2):
+    for s in range(a.shape[0]):
+      i0, i1 = int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h)
+      j0, j1 = int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h)
+      for i in range(i0, i1 + 1):
+        for j in range(j0, j1 + 1):
+          c = i * ny + j
+          if p == 0:
+            start[c + 1] += 1
+          else:
+            items[start[c]] = s
+            start[c] += 1
+    if p == 0:
+      for c in range(nx * ny):
+        start[c + 1] += start[c]
+      items = np.empty(start[nx * ny], np.int64)
+  for c in range(nx * ny, 0, -1):
+    start[c] = start[c - 1]
+  start[0] = 0
+  return start, items
+
+
+def segmentGridNumba(a, b, h):
+  """the segments (a, b) listed in every cell of a grid of spacing h their bounding box meets: the
+  origin, the number of cells along y, the cells' starts into the list and the list; None without
+  numba"""
+  if not _useNumba():
+    return None
+  _preparePixel()
+  x0, y0 = min(a[:, 0].min(), b[:, 0].min()), min(a[:, 1].min(), b[:, 1].min())
+  nx = int((max(a[:, 0].max(), b[:, 0].max()) - x0) / h) + 1
+  ny = int((max(a[:, 1].max(), b[:, 1].max()) - y0) / h) + 1
+  start, items = _segmentGrid(a, b, x0, y0, h, nx, ny)
+  return x0, y0, ny, start, items
+
+
+# whether each segment q of the grid crosses another one properly, without a common vertex
+def _crossingLoop(a, b, e, q, x0, y0, h, ny, start, items, out):
+  for k in prange(q.shape[0]):
+    s = q[k]
+    dx, dy = b[s, 0] - a[s, 0], b[s, 1] - a[s, 1]
+    i0, i1 = int((min(a[s, 0], b[s, 0]) - x0) / h), int((max(a[s, 0], b[s, 0]) - x0) / h)
+    j0, j1 = int((min(a[s, 1], b[s, 1]) - y0) / h), int((max(a[s, 1], b[s, 1]) - y0) / h)
+    hit = False
+    for i in range(i0, i1 + 1):
+      for j in range(j0, j1 + 1):
+        c = i * ny + j
+        for m in range(start[c], start[c + 1]):
+          r = items[m]
+          if e[r, 0] == e[s, 0] or e[r, 0] == e[s, 1] or e[r, 1] == e[s, 0] or e[r, 1] == e[s, 1]:
+            continue
+          ex, ey = b[r, 0] - a[r, 0], b[r, 1] - a[r, 1]
+          den = dx * ey - dy * ex
+          if den == 0:
+            continue
+          wx, wy = a[r, 0] - a[s, 0], a[r, 1] - a[s, 1]
+          u = (wx * ey - wy * ex) / den
+          v = (wx * dy - wy * dx) / den
+          if 0 < u < 1 and 0 < v < 1:
+            hit = True
+            break
+        if hit:
+          break
+      if hit:
+        break
+    out[s] = hit
+
+
+_PIXEL_HELPERS = ("_fillAt", "_segmentGrid", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator",)
 
@@ -1409,7 +1532,7 @@ def _extremalWidthLoop(H, offsets, shortest, longest):
 
 _PIXEL_LOOPS = {"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop,
                 "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop,
-                "absorb": _absorbLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
+                "absorb": _absorbLoop, "fill": _fillLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
 
 
 def pixelKernel(name, backend=None):
