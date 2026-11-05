@@ -254,6 +254,71 @@ the samples of 760 000 moved segments and the setup around them) and the absorpt
 (0.7 s, 0.24 s before). A raster of the cells boundary segments touch, to let a pixel far from them skip the
 polygon test, cost more to build than it saved on 1C_1's small grains.
 
+### The straightening after the Fable 5.1 proposals, 2026-11-05
+
+Branch `claude/straighten-fable-548ece` on top of 9c12bd5. A MATLAB session had a Fable 5.1 agent propose
+cheaper checks for `straightenInFill.m` (B, the same output) and a chord-based pinning rule (A, a changed
+output); this is what of them pays in this port, measured stage by stage on 1C_1 (the complex before the
+straightening pickled, `straightenInFill` alone, laptop, 4 threads, min of 3):
+
+| stage of straightenInFill, 1C_1 | 9c12bd5 | now | what changed |
+|---|---:|---:|---|
+| whole | 1.86 s | 1.05 s | |
+| crossing test, grids and queries | 0.47 | 0.25 | the sweep test runs first and the crossing test asks only for the segments that stay in the fill (the crossing finds 5490 of the 307 000 bad segments of round 1); one grid per round of the segments moved in it, where they are then, a query checking every grid, instead of a grid of all segments moved since the first, rebuilt each round (630 000 segments for the 234 queries of round 4); the grids built from the vertices and the segment list in place, within the box of the held vertices, over the cells the queries meet; two pixel cells instead of four |
+| solve | 0.31 | 0.08 | the chains of the system eliminated: 55 % of the 515 000 free vertices of round 1 have two free neighbours and 10 % three or more, so every path of vertices with at most two free neighbours is reduced by the Thomas recursion onto its anchors, the 50 000 anchors solved by SuperLU, the chains substituted back (`chainSolveNumba`); the only step that moves the output, by the rounding of the elimination order: at most 1e-10 µm in a vertex, 4e-7 µm² in an area, no grain id |
+| sweep samples | 0.26 | 0.15 | the fill test takes the roots of the two nearest lattice points instead of all four (a root is monotone, so the same two are nearest); the new segment sampled first, where a sweep leaves the fill; a segment whose ends stayed sampled once |
+| setup: fill test, cut, half edges | 0.44 | 0.28 | the boundary faces gathered once, the two-column reductions (`max(axis=1)`, `min(axis=0)`, `any(axis=1)`) written out, the neighbour of a half edge from the segments' vertex sums, the split faces appended instead of re-gathered |
+| per round | 0.3 | 0.2 | the held vertices and the chains to re-solve marked instead of `unique` and `isin` |
+
+What of proposal B does not pay here: the raster lookup instead of four lattice points - the fill test
+already reads the raster at the four points, and skipping the roots where the nearest point is filled
+saved nothing measurable (0.156 to 0.150 s) through the call between compiled helpers; the line and path
+samples with an island check - they change the sample set, so the output, and the early exit for a swept
+quad whose lattice box is all fill applies to 1 % of them, the fill being one to three pixels wide; the
+cheaper components - `connected_components` costs 0.02 s. The cut's 16 bisections and the direct assembly
+of the CSC were tried and left: 0.03 s, and the sort of the indices moved into the solve.
+
+On bayes (16 physical cores, 4 threads, at a load of 9 to 12 from other users, both versions in one job,
+best of five, 1C_1 of three; now = f41d999, the state of the table above):
+
+| map | setting | calcGrains now | straightened | smoothBoundary now | straightened |
+|---|---|---:|---:|---:|---:|
+| small | 10°, minPixel 5 | 0.035 | 0.030 | 0.003 | 0.002 |
+| peridotite | alpha 2.1, minPixel 5 | 0.344 | 0.351 | 0.038 | 0.038 |
+| peridotite | alpha 6.1, minPixel 5 | 0.419 | 0.417 | 0.027 | 0.028 |
+| peridotite | alpha 16.1, minPixel 5 | 0.849 | 0.853 | 0.027 | 0.026 |
+| forsterite | defaults | 0.393 | 0.376 | 0.060 | 0.064 |
+| forsterite | minPixel 5 | 0.758 | 0.757 | 0.044 | 0.043 |
+| 1C_1 | 10° | 5.88 | 5.05 | 2.49 | 2.47 |
+
+The smaller maps straighten in a few hundredths of a second either way. What 1C_1 still spends beyond
+`straighten=False` (3.79 s) is about 1.2 s: the two compiled tests (0.4 s), the setup and the bookkeeping
+of five rounds in NumPy (0.5 s), the solve (0.1 s); beyond base, the absorption's polygon test (0.7 s).
+
+**Proposal A** is in as the private switch `PIN_FARTHEST` of `mtex/maps/straighten.py`, off: a chain of
+free vertices with a segment that sweeps out of the fill or crosses holds only the vertex whose old
+position lies farthest from the chord through the chain's solved ends (Douglas-Peucker), the chains read
+off the elimination, instead of both ends of every bad segment; a bad segment without a free chain vertex
+holds both ends as before. Measured (`calcGrains`, the indexed pixels compared by grain):
+
+| | default | PIN_FARTHEST |
+|---|---:|---:|
+| 1C_1 rounds | 5 | 12 (112 000 vertices held in round 1 for 400 000, then 90 000, 50 000, 24 000, ...) |
+| 1C_1 boundary length | 162 566 µm | 161 703 µm (-0.53 %) |
+| 1C_1 vertices moved | 200 530 | 308 926 |
+| 1C_1 grains whose area changes | | 81 434 of 118 899, at most 0.35 µm² |
+| 1C_1 pixels changing grain | | 18 271 of 2 529 549, all notIndexed in the fill, absorbed (8835) or released (9436); no indexed pixel |
+| forsterite boundary length | 2 052 205 µm | 2 036 501 µm (-0.77 %) |
+| forsterite pixels changing grain | | 1404 of 245 952, all notIndexed, 635 absorbed and 769 released; one one-pixel grain's polygon in a crack shrinks by 58 % |
+| straightenInFill 1C_1, laptop | 1.05 s | 1.75 s |
+| calcGrains, bayes, one job at 1892ccb | 1C_1 4.76 s, forsterite 0.341 s | 1C_1 5.70 s, forsterite 0.387 s |
+
+A costs more, not less, here: every round re-solves the whole chains a held vertex belongs to, so their
+vertices move for real and their segments are tested again (609 000 in round 2 for both rules, 343 000 in
+round 3 for 20 000), the rounds halve from 12 instead of ending after 5, and the queries check one grid
+per round; a threshold on the move changed nothing, the moves are not rounding. The straighter result and
+its price are the decision; it leaves the parity with MATLAB develop (`bench/calcgrains_ops.py`).
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three
