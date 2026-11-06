@@ -48,18 +48,28 @@ def straightenInFill(c, seg):
   # a boundary segment entering the filled cells gets a vertex there, by bisection
   d0, d1 = dV[FB[:, 0]], dV[FB[:, 1]]
   cut = np.flatnonzero(isB)[(np.maximum(d0, d1) > tol) & (np.minimum(d0, d1) < -tol)]
-  a, b = V[F[cut, 0]], V[F[cut, 1]]
-  lo, hi = np.zeros((len(cut), 1)), np.ones((len(cut), 1))
-  aIn = dV[F[cut, 0]] > 0
-  for _ in range(16):
-    mid = (lo + hi) / 2
-    isA = (inFill(a + mid * (b - a)) > 0) == aIn
-    lo[isA], hi[~isA] = mid[isA], mid[~isA]
+  a, b = np.ascontiguousarray(V[F[cut, 0]]), np.ascontiguousarray(V[F[cut, 1]])
+  loop = pixelKernel("cut") if inFill.rigid else None
+  if loop is not None:
+    t = np.empty((len(cut), 1))
+    loop(a, b, *inFill.lattice, t[:, 0])
+  else:
+    lo, hi = np.zeros((len(cut), 1)), np.ones((len(cut), 1))
+    aIn = dV[F[cut, 0]] > 0
+    for _ in range(16):
+      mid = (lo + hi) / 2
+      isA = (inFill(a + mid * (b - a)) > 0) == aIn
+      lo[isA], hi[~isA] = mid[isA], mid[~isA]
+    t = (lo + hi) / 2
   nV = len(V)
   new = nV + np.arange(len(cut))
-  V = np.vstack([V, a + (lo + hi) / 2 * (b - a)])
+  V = np.vstack([V, a + t * (b - a)])
   dV = np.concatenate([dV, inFill(V[nV:])])
-  F = np.vstack([F, np.column_stack([new, F[cut, 1]])])
+  # the cut faces end at the new vertices, the new faces continue to their old ends
+  at = np.cumsum(isB)[cut] - 1
+  tail = FB[at, 1].copy()
+  FB[at, 1] = new
+  F = np.vstack([F, np.column_stack([new, tail])])
   F[cut, 1] = new
   cells = np.vstack([cells, cells[cut]])
   isB = np.concatenate([isB, np.ones(len(cut), dtype=bool)])
@@ -67,7 +77,8 @@ def straightenInFill(c, seg):
   # the boundary vertices alone, numbered from 0 in e in the order of V
   used = np.concatenate([used, np.ones(len(cut), dtype=bool)])
   vB = np.flatnonzero(used)
-  e = (np.cumsum(used, dtype=np.int64) - 1)[F[isB]]
+  renum = np.cumsum(used, dtype=np.int64) - 1
+  e = np.vstack([renum[FB], np.column_stack([renum[new], renum[tail]])])
   from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
   from scipy.sparse.linalg import spsolve
@@ -85,7 +96,7 @@ def straightenInFill(c, seg):
   # tests the segments that moved
   W, mi, reset, lab, loc, grids, chains = W0.copy(), np.flatnonzero(~isFixed), np.zeros(0, dtype=np.int64), np.full(nB, -1), np.full(nB, -1), [], None
   # the solve keeps every vertex in the hull of the held ones, so the box of W0 holds every round
-  box = W0.T.min(axis=1), W0.T.max(axis=1)
+  box = np.array([W0[:, 0].min(), W0[:, 1].min()]), np.array([W0[:, 0].max(), W0[:, 1].max()])
   while True:
     moved = [reset[(W[reset, 0] != W0[reset, 0]) | (W[reset, 1] != W0[reset, 1])]]
     W[reset] = W0[reset]

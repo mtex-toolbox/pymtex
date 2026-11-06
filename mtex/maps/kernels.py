@@ -1512,6 +1512,21 @@ def _fillAt(x, y, p0, Minv, M, fill, lo0, lo1):
   return 0.0 if abs(d) <= 1e-12 * (dO + dF) and np.isfinite(d) else d
 
 
+# the cut point of every segment from a to b by 16 bisections of the fill test's sign, as
+# straightenInFill's NumPy form: the parameter of the end point
+def _cutLoop(a, b, p0, Minv, M, fill, lo0, lo1, out):
+  for k in prange(a.shape[0]):
+    aIn = _fillAt(a[k, 0], a[k, 1], p0, Minv, M, fill, lo0, lo1) > 0
+    lo, hi = 0.0, 1.0
+    for _ in range(16):
+      mid = (lo + hi) / 2
+      if (_fillAt(a[k, 0] + mid * (b[k, 0] - a[k, 0]), a[k, 1] + mid * (b[k, 1] - a[k, 1]), p0, Minv, M, fill, lo0, lo1) > 0) == aIn:
+        lo = mid
+      else:
+        hi = mid
+    out[k] = (lo + hi) / 2
+
+
 # the fill test at every point
 def _fillLoop(P, p0, Minv, M, fill, lo0, lo1, out):
   for k in prange(P.shape[0]):
@@ -2030,7 +2045,7 @@ def _extremalWidthLoop(H, offsets, shortest, longest):
 
 _PIXEL_LOOPS = {"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop,
                 "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop,
-                "absorb": _absorbLoop, "fill": _fillLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
+                "absorb": _absorbLoop, "fill": _fillLoop, "cut": _cutLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
 
 
 def pixelKernel(name, backend=None):
