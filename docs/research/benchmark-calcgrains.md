@@ -352,6 +352,42 @@ CHAIN_DP gives A's straightness at the default's cost: what remains of its time 
 solve 0.1 s) and the chain pass (0.16 s), the junction redo (0.06 s), one crossing check (0.12 s). Both
 rules change the result and leave the parity with MATLAB develop; the choice is Ralf's.
 
+### The ideas beyond the straightening, 2026-11-06
+
+Two more of the profile's items, both exact (28 dump files and the 1C_1 complex identical):
+
+- **The absorption's polygon test in y buckets** (`absorbBucketsNumba`, fc78a76). A pixel's corner was tested
+  against every segment of a candidate grain's polygon, 541 million segment visits on 1C_1 (a grain has 8
+  segments in the median and up to 1901). The segments of every grain are now listed by the y bucket of a
+  pixel, their y range widened by the boundary tolerance, and a corner reads its bucket alone: 22 million
+  visits. The sites of the window and their distances are gathered once instead of in two passes. The
+  buckets cost one pass over the segments (the fill of 3.7 million listings, 0.2 s on the laptop at 1.2 GHz).
+- **The straightening's setup** (61a7e79): the 16 bisections of the cut points in one compiled loop
+  instead of 16 launches, the segment list from the boundary faces gathered once, the box of the held
+  vertices from the columns, since NumPy's reductions over a two-column array are ten times slower than
+  over a column (131 ms for 15 on 1 082 611 vertices).
+
+bayes, one job at 61a7e79 (load 12), best of five, 1C_1 of three; now = f41d999, before all of this:
+
+| map | setting | calcGrains now | tip | A | CHAIN_DP |
+|---|---|---:|---:|---:|---:|
+| small | 10°, minPixel 5 | 0.029 | 0.028 | | |
+| peridotite | alpha 2.1, minPixel 5 | 0.343 | 0.324 | | |
+| peridotite | alpha 6.1, minPixel 5 | 0.419 | 0.384 | | |
+| peridotite | alpha 16.1, minPixel 5 | 0.856 | 0.795 | | |
+| forsterite | defaults | 0.391 | 0.269 | 0.298 | 0.285 |
+| forsterite | minPixel 5 | 0.764 | 0.650 | | |
+| 1C_1 | 10° | 6.08 | 5.00 | 5.31 | 4.64 |
+
+Worth integrating: everything on the branch under the default rule - the straightening (the chain solve,
+the tests in the right order, the grids per round) and the absorption's buckets, which is what the small
+maps gain (forsterite -31 %, peridotite -5 to -8 %); 1C_1 is at -18 % against the same job's baseline, the
+setup fusion within the job's noise there. Of the rules that change the result, `CHAIN_DP` is now the
+fastest of the three on 1C_1 (-7 % against the default) and gives the straightest boundaries but for A;
+`PIN_FARTHEST` costs 6 % more than the default. Both wait on the decision about parity with MATLAB develop.
+The laptop's timings of this day are not comparable with the day before: it ran in powersave at 0.9 to
+1.2 GHz under other load.
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three
