@@ -27,6 +27,9 @@ PIN_FARTHEST = False
 # straightens every chain of degree-two vertices between them on its own, Douglas-Peucker on its
 # chord (straightenChains); it changes the result too, so it stays off
 CHAIN_DP = False
+# with CHAIN_DP, the junctions solved once more after the chain pass, the pinned vertices held,
+# and the chains whose ends moved done again
+CHAIN_DP_RESOLVE = False
 
 
 def straightenInFill(c, seg):
@@ -79,9 +82,7 @@ def straightenInFill(c, seg):
   vB = np.flatnonzero(used)
   renum = np.cumsum(used, dtype=np.int64) - 1
   e = np.vstack([renum[FB], np.column_stack([renum[new], renum[tail]])])
-  from scipy.sparse import coo_matrix
   from scipy.sparse.csgraph import connected_components
-  from scipy.sparse.linalg import spsolve
   nB, m = len(vB), len(e)
   # the half edges by their first vertex: the segment and the neighbour of each, counting sorted
   ptr = np.concatenate([[0], np.cumsum(np.bincount(e.reshape(-1), minlength=nB))])
@@ -101,28 +102,12 @@ def straightenInFill(c, seg):
     moved = [reset[(W[reset, 0] != W0[reset, 0]) | (W[reset, 1] != W0[reset, 1])]]
     W[reset] = W0[reset]
     if len(mi):
-      # (D + 1e-3) W - A W = A W0 over the held neighbours + 1e-3 W0, the free vertices in their order
-      n = len(mi)
-      rows, j = np.repeat(np.arange(n), deg[mi]), nbr[_ranges(ptr, mi)]
-      loc[:] = -1
-      loc[mi] = np.arange(n)
-      lj = loc[j]
-      ff, fx = lj >= 0, isFixed[j]
-      M = coo_matrix((np.concatenate([deg[mi] + 1e-3, -np.ones(ff.sum())]), (np.concatenate([np.arange(n), rows[ff]]),
-                      np.concatenate([np.arange(n), lj[ff]]))), shape=(n, n)).tocsc()
-      key, cnt = np.unique(rows[fx].astype(np.int64) * nB + j[fx], return_counts=True)
-      r, col = key // nB, key % nB
-      rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
-      Wm = chainSolveNumba(M, rhs, chains=PIN_FARTHEST)
-      if Wm is None:
-        Wm = spsolve(M, rhs).reshape(-1, 2)
-      elif PIN_FARTHEST:
-        Wm, chains = Wm[0], Wm[1:]
+      Wm, M, chains = solveFree(mi, W0, isFixed, ptr, nbr, deg, loc, PIN_FARTHEST)
       moved.append(mi[(Wm[:, 0] != W[mi, 0]) | (Wm[:, 1] != W[mi, 1])])
       W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
       if CHAIN_DP:
-        W = straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, dxy, inFill, tol, box)
+        W = straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, deg, loc, dxy, inFill, tol, box)
         break
     moved = np.concatenate(moved)
     isM = np.zeros(m, dtype=bool)
@@ -153,7 +138,30 @@ def straightenInFill(c, seg):
           segmentation(grainId, seg.nGrains, split(seg.connect), split(seg.isInner), split(seg.isOuter)))
 
 
-def straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, dxy, inFill, tol, box):
+def solveFree(mi, W0, isFixed, ptr, nbr, deg, loc, chains=False):
+  """the free vertices mi solved, each at the mean of its neighbours, the held ones at W0, with a
+  pull of 1e-3 to its own W0: (D + 1e-3) W - A W = A W0 + 1e-3 W0 in their order; the positions,
+  the matrix, and with chains the chains of the elimination (chainSolveNumba) or None"""
+  from scipy.sparse import coo_matrix
+  from scipy.sparse.linalg import spsolve
+  n, nB = len(mi), len(W0)
+  rows, j = np.repeat(np.arange(n), deg[mi]), nbr[_ranges(ptr, mi)]
+  loc[:] = -1
+  loc[mi] = np.arange(n)
+  lj = loc[j]
+  ff, fx = lj >= 0, isFixed[j]
+  M = coo_matrix((np.concatenate([deg[mi] + 1e-3, -np.ones(ff.sum())]), (np.concatenate([np.arange(n), rows[ff]]),
+                  np.concatenate([np.arange(n), lj[ff]]))), shape=(n, n)).tocsc()
+  key, cnt = np.unique(rows[fx].astype(np.int64) * nB + j[fx], return_counts=True)
+  r, col = key // nB, key % nB
+  rhs = np.column_stack([np.bincount(r, weights=cnt * W0[col, k], minlength=n) for k in (0, 1)]) + 1e-3 * W0[mi]
+  Wm = chainSolveNumba(M, rhs, chains=chains)
+  if Wm is None:
+    return spsolve(M, rhs).reshape(-1, 2), M, None
+  return (Wm[0], M, Wm[1:]) if chains else (Wm, M, None)
+
+
+def straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, deg, loc, dxy, inFill, tol, box):
   """the vertices under CHAIN_DP: the free junctions held where the first solve put them, every
   chain of degree-two vertices between held vertices straightened on its own (chainDPNumba); a
   junction whose segment to a decided vertex sweeps out of the fill goes back and its chains are
@@ -166,34 +174,54 @@ def straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, dxy, inFill, tol, box):
   segChain, k = np.full(m, -1, dtype=np.int64), chainS >= 0
   segChain[chainS[k]] = np.repeat(np.arange(len(chainPtr) - 1), np.diff(chainPtr))[k]
   pin, reset = np.zeros(nB, dtype=bool), np.zeros(nB, dtype=bool)
-  cs, grids, q = np.arange(len(chainPtr) - 1), [], None
-  while len(cs):
-    chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, inFill.lattice, tol)
-    r = np.flatnonzero(reset)
-    if len(r):
-      # the junctions back where they were, held, their chains again without their pins
+  chainsOf = lambda v: np.flatnonzero(np.isin(ends, v).any(axis=1))
+  segmentsOf = lambda cs: chainS[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr))]
+
+  # the chains cs straightened, a junction whose segment to a decided vertex sweeps out put back,
+  # held, and its chains done again without their pins, until none is
+  def settle(cs):
+    while len(cs):
+      chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, inFill.lattice, tol)
+      r = np.flatnonzero(reset)
+      if not len(r):
+        return
       W[r], isFixed[r], reset[r] = W0[r], True, False
-      cs = np.flatnonzero(np.isin(ends, r).any(axis=1))
+      cs = chainsOf(r)
       pin[chainV[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr)) & inner]] = False
-      continue
-    # the crossings of the segments moved, or since the last check of the chains done again
-    if q is None:
-      moved = (W[:, 0] != W0[:, 0]) | (W[:, 1] != W0[:, 1])
-      q = np.flatnonzero(moved[e[:, 0]] | moved[e[:, 1]])
+
+  settle(np.arange(len(chainPtr) - 1))
+  if CHAIN_DP_RESOLVE:
+    # the junctions once more, the pinned vertices held, and the chains whose ends moved by more
+    # than the fill tolerance again
+    held = isFixed | pin
+    mi = np.flatnonzero(~held)
+    Wm = solveFree(mi, W0, held, ptr, nbr, deg, loc)[0]
+    isEnd = np.zeros(nB, dtype=bool)
+    isEnd[ends] = True
+    j, Wj = mi[isEnd[mi]], Wm[isEnd[mi]]
+    movedEnd = np.abs(Wj - W[j]).max(axis=1) > tol
+    j = j[movedEnd]
+    W[j] = Wj[movedEnd]
+    settle(chainsOf(j))
+  # the crossings of the segments moved, then of the chains done again; both segments of a
+  # crossing keep their vertices, pinned in a chain, held as a junction
+  moved = (W[:, 0] != W0[:, 0]) | (W[:, 1] != W0[:, 1])
+  q, grids = np.flatnonzero(moved[e[:, 0]] | moved[e[:, 1]]), []
+  while len(q):
     partner, grids = crossing(W, e, q, 2 * dxy, box, grids, q, partner=True)
     isX = partner >= 0
     if not isX.any():
       break
-    # both segments of a crossing keep their vertices: pinned in a chain, held as a junction
     isX[partner[isX]] = True
     v = e[isX].reshape(-1)
     j = v[~np.isin(v, chainV[inner])]
     W[j], isFixed[j] = W0[j], True
     pin[v] = True
     W[v] = W0[v]
-    cs = np.unique(np.concatenate([segChain[isX], np.flatnonzero(np.isin(ends, j).any(axis=1))]))
+    cs = np.unique(np.concatenate([segChain[isX], chainsOf(j)]))
     cs = cs[cs >= 0]
-    q = chainS[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr))]
+    settle(cs)
+    q = segmentsOf(cs)
     q = q[q >= 0]
   return W
 
