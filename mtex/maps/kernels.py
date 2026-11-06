@@ -1299,48 +1299,107 @@ def _expLoop(ref, v, out):
 
 # ------------------------------------------------------------------ the compilation of these
 
-# the grain of every pixel the closing left without a cell: the grains of the sites with a grain
-# nearest to its centre, searched over the lattice cells around the pixel, are the candidates,
-# and the pixel joins the first whose polygon, the edges ea -> eb of grain g at segStart[g] ..
-# segStart[g + 1] - 1 between the vertices V, holds every nudged corner of its footprint
-# strictly, farther than eps from its boundary; calcgrains.absorbInteriorPixels is the NumPy form
-def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, V, ea, eb, eps, out):
+# the segments of every grain listed by the y bucket of height h, bucket (ymin_g - eps) + b h,
+# every segment in each bucket its y range [ylo, yhi] widened by eps meets: y0, nby and bb per
+# grain (the lowest y, the number of buckets, the first bucket in the global list), then the
+# buckets' starts into items and items
+def _absorbBucketsLoop(segStart, ylo, yhi, h, eps, y0, nby, bb):
+  nG = segStart.shape[0] - 1
+  bb[0] = 0
+  for g in range(nG):
+    lo, hi = np.inf, -np.inf
+    for m in range(segStart[g], segStart[g + 1]):
+      lo, hi = min(lo, ylo[m]), max(hi, yhi[m])
+    y0[g] = lo - eps
+    nby[g] = int((hi + eps - y0[g]) / h) + 1 if segStart[g + 1] > segStart[g] else 0
+    bb[g + 1] = bb[g] + nby[g]
+  return bb[nG]
+
+
+def _absorbBucketsFill(segStart, ylo, yhi, h, eps, y0, bb, start):
+  nG = segStart.shape[0] - 1
+  items = np.empty(0, np.int64)
+  for p in range(2):
+    for g in range(nG):
+      for m in range(segStart[g], segStart[g + 1]):
+        for b in range(int((ylo[m] - eps - y0[g]) / h), int((yhi[m] + eps - y0[g]) / h) + 1):
+          c = bb[g] + b
+          if p == 0:
+            start[c + 1] += 1
+          else:
+            items[start[c]] = m
+            start[c] += 1
+    if p == 0:
+      for c in range(start.shape[0] - 1):
+        start[c + 1] += start[c]
+      items = np.empty(start[start.shape[0] - 1], np.int64)
+  for c in range(start.shape[0] - 1, 0, -1):
+    start[c] = start[c - 1]
+  start[0] = 0
+  return items
+
+
+def absorbBucketsNumba(segStart, V, ea, eb, h, eps):
+  """the y buckets of the grains' segments for the absorb loop: y0, nby, bb, h, start, items"""
+  _preparePixel()
+  nG = len(segStart) - 1
+  ya, yb = V[ea, 1], V[eb, 1]
+  ylo, yhi = np.minimum(ya, yb), np.maximum(ya, yb)
+  y0, nby, bb = np.empty(nG), np.empty(nG, np.int64), np.empty(nG + 1, np.int64)
+  n = _COMPILED["_absorbBucketsLoop"](segStart, ylo, yhi, h, eps, y0, nby, bb)
+  start = np.zeros(n + 1, np.int64)
+  items = _COMPILED["_absorbBucketsFill"](segStart, ylo, yhi, h, eps, y0, bb, start)
+  return y0, nby, bb, h, start, items
+
+
+# the grain of every pixel todo without one: of the sites within reach of its lattice cell, the
+# nearest with a grain, and on a tie each of them in the order of the cells, the first whose
+# polygon holds the four nudged corners of the pixel strictly, farther than eps from its
+# boundary, tested against the segments of the corner's y bucket alone;
+# calcgrains.absorbInteriorPixels is the NumPy form
+def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, V, ea, eb, y0, nby, bb, h, bstart, items, eps, out):
   n1, n2 = lookup.shape
+  w = (2 * reach + 1) * (2 * reach + 1)
   for t in prange(len(todo)):
     k = todo[t]
     a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
     px, py = P[k, 0], P[k, 1]
-    bestD = np.inf
+    # the sites with a grain in the window and their squared distances, once
+    cs, cd = np.empty(w, np.int64), np.empty(w)
+    n, bestD = 0, np.inf
     for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
       for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
         s = lookup[a, b]
         if s >= 0 and siteGrain[s] > 0:
-          bestD = min(bestD, (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2)
-    for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
-      for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
-        s = lookup[a, b]
-        if s < 0 or siteGrain[s] <= 0 or (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2 > bestD * (1 + 1e-9):
-          continue
-        g = siteGrain[s]
-        ok = True
-        for c in range(corners.shape[0]):
-          qx, qy = px + corners[c, 0], py + corners[c, 1]
-          inside = False
-          near = False
-          for m in range(segStart[g], segStart[g + 1]):
-            x1, y1, x2, y2 = V[ea[m], 0], V[ea[m], 1], V[eb[m], 0], V[eb[m], 1]
-            if (y1 > qy) != (y2 > qy) and qx < x1 + (qy - y1) * (x2 - x1) / (y2 - y1):
-              inside = not inside
-            dx, dy = x2 - x1, y2 - y1
-            u = min(1.0, max(0.0, ((qx - x1) * dx + (qy - y1) * dy) / max(dx * dx + dy * dy, 1e-300)))
-            near = near or (qx - x1 - u * dx) ** 2 + (qy - y1 - u * dy) ** 2 <= eps * eps
-          if near or not inside:
-            ok = False
-            break
-        if ok:
-          out[k] = g
+          cs[n], cd[n] = s, (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2
+          bestD = min(bestD, cd[n])
+          n += 1
+    for i in range(n):
+      if cd[i] > bestD * (1 + 1e-9):
+        continue
+      g = siteGrain[cs[i]]
+      ok = True
+      for c in range(corners.shape[0]):
+        qx, qy = px + corners[c, 0], py + corners[c, 1]
+        bi = int((qy - y0[g]) / h) if qy >= y0[g] else -1
+        if bi < 0 or bi >= nby[g]:
+          ok = False
           break
-      if out[k] > 0:
+        inside = False
+        near = False
+        for mm in range(bstart[bb[g] + bi], bstart[bb[g] + bi + 1]):
+          m = items[mm]
+          x1, y1, x2, y2 = V[ea[m], 0], V[ea[m], 1], V[eb[m], 0], V[eb[m], 1]
+          if (y1 > qy) != (y2 > qy) and qx < x1 + (qy - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+          dx, dy = x2 - x1, y2 - y1
+          u = min(1.0, max(0.0, ((qx - x1) * dx + (qy - y1) * dy) / max(dx * dx + dy * dy, 1e-300)))
+          near = near or (qx - x1 - u * dx) ** 2 + (qy - y1 - u * dy) ** 2 <= eps * eps
+        if near or not inside:
+          ok = False
+          break
+      if ok:
+        out[k] = g
         break
 
 
@@ -1906,7 +1965,7 @@ def chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, lattice, tol):
   return W
 
 
-_PIXEL_HELPERS = ("_fillAt", "_quadOut", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_chainsLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+_PIXEL_HELPERS = ("_fillAt", "_quadOut", "_absorbBucketsLoop", "_absorbBucketsFill", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_chainsLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator", "_chainBackLoop")
 

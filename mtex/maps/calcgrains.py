@@ -21,7 +21,7 @@ from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import decompose, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
-from .kernels import edgesByGrainNumba, grainKernel, pixelKernel
+from .kernels import absorbBucketsNumba, edgesByGrainNumba, grainKernel, pixelKernel
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 from .straighten import straightenInFill
@@ -140,12 +140,16 @@ def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, r
     edges = F2[order, 0], F2[order, 1], np.searchsorted(g[order], np.arange(top + 1))
   ea, eb, segStart = (np.ascontiguousarray(x, dtype=np.int64) for x in edges)
   s = c.sites
-  args = (todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
-          int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach, segStart, V, ea, eb,
-          1e-9 * c.dxy, out)
-  # all pixels in one compiled loop, its Python form below as fallback
+  args = [todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
+          int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach]
+  eps = 1e-9 * c.dxy
+  # all pixels in one compiled loop, the grains' segments in y buckets of a pixel; its Python form
+  # below as fallback, over all segments of a grain
   loop = pixelKernel("absorb", backend)
-  (loop or _absorbPython)(*args)
+  if loop is None:
+    _absorbPython(*args, segStart, V, ea, eb, eps, out)
+  else:
+    loop(*args, V, ea, eb, *absorbBucketsNumba(segStart, V, ea, eb, c.dxy, eps), eps, out)
   return out
 
 
