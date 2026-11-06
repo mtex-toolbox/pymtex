@@ -388,6 +388,20 @@ fastest of the three on 1C_1 (-7 % against the default) and gives the straightes
 The laptop's timings of this day are not comparable with the day before: it ran in powersave at 0.9 to
 1.2 GHz under other load.
 
+**The junctions solved once more** (`CHAIN_DP_RESOLVE`, 2b8a8de): CHAIN_DP holds the junctions where
+the one global solve put them, with every chain still free; this refinement solves them again after the
+chain pass with the pinned vertices held, and does the chains again whose end moved by more than the fill
+tolerance (nearly all of them), one crossing pass at the end for both. On 1C_1 the boundary length falls to
+161 242 µm (-0.81 % against the default, -0.42 % without the re-solve), on forsterite to 2 033 106 (-0.93 %),
+the indexed pixels keep their grains. bayes, one job at 2b8a8de (load 11-12): default 4.60 s, CHAIN_DP 4.71 s,
+with the re-solve 4.93 s on 1C_1; forsterite 0.282 / 0.312 / 0.337. The three rules lie within the job's noise
+of about 0.3 s on 1C_1 (the job before had CHAIN_DP at 4.64 against 5.00); the re-solve costs its second
+chain pass and about a fifth of the straightening on the laptop. The rule to carry to MATLAB develop is the
+one with the re-solve, the complete form; both switches stay off here until both ports have it.
+
+The branch fast-forwards onto `claude/grainportnov-c249a4`, which has been moved to its tip (2b8a8de) with
+both switches off, so the grain port reaches main as one piece.
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three
