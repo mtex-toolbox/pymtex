@@ -197,11 +197,10 @@ straightening.
   held in MATLAB and straight here (32 µm apart), on the hexagonal T1 instance two of 400 segments in the
   first round, after which 1877 vertices differ by up to 0.22 pixels. A count with a tolerance,
   `ceil(3 len / dxy - 1e-9)`, would make it deterministic in both ports.
-- The absorbed notIndexed pixels differ in two ways, both MATLAB's: MATLAB counts a nudged corner on a
-  boundary as inside, so it absorbs a pixel a diagonal bisector runs through (forsterite: about 1000
-  pixels it absorbs and this port does not); and it tests only the grain of the one nearest measured pixel, so
-  after straightening a pixel wholly inside the other grain stays at 0 (forsterite: 597 pixels this port
-  absorbs, 199 of the first 200 checked to lie wholly in one of MATLAB's own polygons).
+- The absorbed notIndexed pixels are MATLAB develop's since ff980e71c on both sides (the rule by lattice
+  cells below): identical on small, forsterite and peridotite at alpha 2.8 and 16.1; where the straightened
+  boundaries differ between the ports, so do the pixels along them (1C_1: 17 of 2 529 549, peridotite at
+  alpha 10: 411), and given MATLAB's own segments the rule gives MATLAB's pixel on every one of them.
 
 ### Time
 
@@ -401,6 +400,36 @@ one with the re-solve, the complete form; both switches stay off here until both
 
 The branch fast-forwards onto `claude/grainportnov-c249a4`, which has been moved to its tip (2b8a8de) with
 both switches off, so the grain port reaches main as one piece.
+
+### The grain of a notIndexed pixel by lattice cells, 2026-11-08
+
+MATLAB develop ff980e71c replaced the absorption rule: a pixel at 0 takes a grain when no boundary segment
+meets its unit cell pulled in to 95 %, from a neighbour sharing an edge or a corner (the 8 slots within
+1.5 dxy on a square lattice, 6 on a hexagonal one, the closer ones first) whose centre no segment separates
+from its own, and passes it on the same way in sweeps until nothing new is given; every segment is tested
+only against the pixels of the lattice cells its box meets, so nothing is searched. The nearest-pixel rule
+it replaces absorbed a pixel with a quarter of it in a second grain (a wedge whose tip reaches the centre
+runs through the nudged corners) and left a pixel at 0 whose nearest measured pixel lay across a boundary.
+Here it is `absorbInteriorPixels` in `maps/calcgrains.py` with three compiled loops in `maps/kernels.py`
+(the neighbours and the cells of interest, the segment lists of the cells with the boxes computed in
+place, the crossed test, the links over the pixels still open), the NumPy form its oracle (identical on
+every map), the setup it still does in NumPy the raster of the slots and the positions.
+
+Parity with MATLAB develop at ff980e71c on the exported maps (`bench/out/calcgrains/`, the grain id of
+every pixel compared by position): identical on small (10°, minPixel 5), forsterite, peridotite at alpha
+2.8 and 16.1 (minPixel 5). 1C_1 at 10°: 17 of 2 529 549 pixels differ (10 absorbed here only, 7 in MATLAB
+only), all notIndexed, 118 884 of 118 899 grains identical; peridotite at alpha 10: 411 pixels, 462 of
+492 grains. Both come with straightened boundaries that differ between the ports (1C_1: 29 579 segments
+apart by more than 1e-9, up to 0.13 µm; peridotite at alpha 10: 940, up to 270 µm, and one pixel in the
+fill here that is in a notIndexed grain there), MATLAB's `ceil(3 len / dxy)` tie above. Run on MATLAB's
+own segments, this rule gives MATLAB's grain id on every pixel of 1C_1 (192 380 absorbed in both) and of
+peridotite at alpha 10. The measured pixels keep their grains everywhere.
+
+The stage on the laptop (3.8 GHz, 4 threads), the nearest-pixel rule in y buckets against this one:
+small 0.013 s either way, peridotite 0.021 / 0.040 / 0.104 -> 0.009 / 0.009 / 0.010 s (alpha 2.8, 10,
+16.1), forsterite 0.046 -> 0.015 s, forsterite minPixel 5 0.058 -> 0.026 s, 1C_1 0.653 -> 0.330 s
+(612 624 pixels at 0, 1 194 112 segments, 4.7 million listings, 420 201 pixels crossed). bayes was not
+reachable on 2026-11-08; its table is to come (`bayes_jobAbsorb.sh` beside the earlier jobs).
 
 ## MATLAB defects found on the way
 

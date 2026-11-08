@@ -99,8 +99,7 @@ class cellComplex:
       s = c.siteAt(q, ij, reach=2)               # searched over fewer lattice cells
 
     The candidates are the sites of the lattice cells within reach of ij in either index; the
-    nearest of them to q is returned, NO_PIXEL when there is none. calcGrains asks this for the
-    corners of a not indexed pixel to find the grain that absorbs it.
+    nearest of them to q is returned, NO_PIXEL when there is none.
 
     Input
       c - cellComplex
@@ -111,7 +110,7 @@ class cellComplex:
     Keywords
       reach - how many lattice cells either way are searched
     See also
-      calcGrains"""
+      decompose"""
     s = self.sites
     a0, b0 = int(ij[0]) - s.offset[0], int(ij[1]) - s.offset[1]
     n1, n2 = s.lookup.shape

@@ -1299,108 +1299,166 @@ def _expLoop(ref, v, out):
 
 # ------------------------------------------------------------------ the compilation of these
 
-# the segments of every grain listed by the y bucket of height h, bucket (ymin_g - eps) + b h,
-# every segment in each bucket its y range [ylo, yhi] widened by eps meets: y0, nby and bb per
-# grain (the lowest y, the number of buckets, the first bucket in the global list), then the
-# buckets' starts into items and items
-def _absorbBucketsLoop(segStart, ylo, yhi, h, eps, y0, nby, bb):
-  nG = segStart.shape[0] - 1
-  bb[0] = 0
-  for g in range(nG):
-    lo, hi = np.inf, -np.inf
-    for m in range(segStart[g], segStart[g + 1]):
-      lo, hi = min(lo, ylo[m]), max(hi, yhi[m])
-    y0[g] = lo - eps
-    nby[g] = int((hi + eps - y0[g]) / h) + 1 if segStart[g + 1] > segStart[g] else 0
-    bb[g + 1] = bb[g] + nby[g]
-  return bb[nG]
+# the neighbours of every pixel z at the slot offsets off, -1 for an empty slot, and the cells of
+# interest marked in isI: the pixels' own and their neighbours'
+def _absorbSetupLoop(z, slot, P, off, nb, isI):
+  for t in range(z.shape[0]):
+    s = slot[z[t]]
+    isI[s] = True
+    for k in range(off.shape[0]):
+      q = P[s + off[k]]
+      nb[t, k] = q
+      if q >= 0:
+        isI[slot[q]] = True
 
 
-def _absorbBucketsFill(segStart, ylo, yhi, h, eps, y0, bb, start):
-  nG = segStart.shape[0] - 1
+# the index box of the segment a-b on the raster: its ends in the coordinates of the ideal lattice,
+# shifted by one for the margin, the box widened by mg and rounded half up, within the raster
+def _absorbBox(ax, ay, bx, by, ox, oy, Ainv, mg, ni, nj):
+  u1 = (ax - ox) * Ainv[0, 0] + (ay - oy) * Ainv[0, 1] + 1
+  v1 = (ax - ox) * Ainv[1, 0] + (ay - oy) * Ainv[1, 1] + 1
+  u2 = (bx - ox) * Ainv[0, 0] + (by - oy) * Ainv[0, 1] + 1
+  v2 = (bx - ox) * Ainv[1, 0] + (by - oy) * Ainv[1, 1] + 1
+  i0 = max(int(np.floor(min(u1, u2) - mg[0] + 0.5)), 0)
+  j0 = max(int(np.floor(min(v1, v2) - mg[1] + 0.5)), 0)
+  i1 = min(int(np.floor(max(u1, u2) + mg[0] + 0.5)), ni - 1)
+  j1 = min(int(np.floor(max(v1, v2) + mg[1] + 0.5)), nj - 1)
+  return i0, j0, i1, j1
+
+
+# the boundary segments a-b listed by the lattice cells they may meet: every segment into the cells of
+# its index box that isI marks, the cells' starts into items and items, the segments of a cell in
+# increasing order
+def _absorbListLoop(a, b, ox, oy, Ainv, mg, ni, nj, isI, first):
   items = np.empty(0, np.int64)
   for p in range(2):
-    for g in range(nG):
-      for m in range(segStart[g], segStart[g + 1]):
-        for b in range(int((ylo[m] - eps - y0[g]) / h), int((yhi[m] + eps - y0[g]) / h) + 1):
-          c = bb[g] + b
-          if p == 0:
-            start[c + 1] += 1
-          else:
-            items[start[c]] = m
-            start[c] += 1
+    for m in range(a.shape[0]):
+      i0, j0, i1, j1 = _absorbBox(a[m, 0], a[m, 1], b[m, 0], b[m, 1], ox, oy, Ainv, mg, ni, nj)
+      for i in range(i0, i1 + 1):
+        for j in range(j0, j1 + 1):
+          c = i * nj + j
+          if isI[c]:
+            if p == 0:
+              first[c + 1] += 1
+            else:
+              items[first[c]] = m
+              first[c] += 1
     if p == 0:
-      for c in range(start.shape[0] - 1):
-        start[c + 1] += start[c]
-      items = np.empty(start[start.shape[0] - 1], np.int64)
-  for c in range(start.shape[0] - 1, 0, -1):
-    start[c] = start[c - 1]
-  start[0] = 0
+      for c in range(first.shape[0] - 1):
+        first[c + 1] += first[c]
+      items = np.empty(first[first.shape[0] - 1], np.int64)
+  for c in range(first.shape[0] - 1, 0, -1):
+    first[c] = first[c - 1]
+  first[0] = 0
   return items
 
 
-def absorbBucketsNumba(segStart, V, ea, eb, h, eps):
-  """the y buckets of the grains' segments for the absorb loop: y0, nby, bb, h, start, items"""
-  _preparePixel()
-  nG = len(segStart) - 1
-  ya, yb = V[ea, 1], V[eb, 1]
-  ylo, yhi = np.minimum(ya, yb), np.maximum(ya, yb)
-  y0, nby, bb = np.empty(nG), np.empty(nG, np.int64), np.empty(nG + 1, np.int64)
-  n = _COMPILED["_absorbBucketsLoop"](segStart, ylo, yhi, h, eps, y0, nby, bb)
-  start = np.zeros(n + 1, np.int64)
-  items = _COMPILED["_absorbBucketsFill"](segStart, ylo, yhi, h, eps, y0, bb, start)
-  return y0, nby, bb, h, start, items
+# whether the segment a-b and the convex cell at (cx, cy) with the corners uc, the outward edge
+# normals nrm at the offsets h, have a separating axis: the segment's line with every corner strictly
+# on one side, or a cell edge with both ends strictly beyond it
+def _separated(cx, cy, ax, ay, bx, by, uc, nrm, h):
+  dx, dy = bx - ax, by - ay
+  pos, neg = True, True
+  for c in range(uc.shape[0]):
+    pr = (cx - ax + uc[c, 0]) * dy - (cy - ay + uc[c, 1]) * dx
+    pos, neg = pos and pr > 0, neg and pr < 0
+  if pos or neg:
+    return True
+  for c in range(uc.shape[0]):
+    if (ax - cx) * nrm[c, 0] + (ay - cy) * nrm[c, 1] > h[c] and (bx - cx) * nrm[c, 0] + (by - cy) * nrm[c, 1] > h[c]:
+      return True
+  return False
 
 
-# the grain of every pixel todo without one: of the sites within reach of its lattice cell, the
-# nearest with a grain, and on a tie each of them in the order of the cells, the first whose
-# polygon holds the four nudged corners of the pixel strictly, farther than eps from its
-# boundary, tested against the segments of the corner's y bucket alone;
-# calcgrains.absorbInteriorPixels is the NumPy form
-def _absorbLoop(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, V, ea, eb, y0, nby, bb, h, bstart, items, eps, out):
-  n1, n2 = lookup.shape
-  w = (2 * reach + 1) * (2 * reach + 1)
-  for t in prange(len(todo)):
-    k = todo[t]
-    a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
-    px, py = P[k, 0], P[k, 1]
-    # the sites with a grain in the window and their squared distances, once
-    cs, cd = np.empty(w, np.int64), np.empty(w)
-    n, bestD = 0, np.inf
-    for a in range(max(0, a0 - reach), min(n1, a0 + reach + 1)):
-      for b in range(max(0, b0 - reach), min(n2, b0 + reach + 1)):
-        s = lookup[a, b]
-        if s >= 0 and siteGrain[s] > 0:
-          cs[n], cd[n] = s, (sitePos[s, 0] - px) ** 2 + (sitePos[s, 1] - py) ** 2
-          bestD = min(bestD, cd[n])
-          n += 1
-    for i in range(n):
-      if cd[i] > bestD * (1 + 1e-9):
-        continue
-      g = siteGrain[cs[i]]
-      ok = True
-      for c in range(corners.shape[0]):
-        qx, qy = px + corners[c, 0], py + corners[c, 1]
-        bi = int((qy - y0[g]) / h) if qy >= y0[g] else -1
-        if bi < 0 or bi >= nby[g]:
-          ok = False
-          break
-        inside = False
-        near = False
-        for mm in range(bstart[bb[g] + bi], bstart[bb[g] + bi + 1]):
-          m = items[mm]
-          x1, y1, x2, y2 = V[ea[m], 0], V[ea[m], 1], V[eb[m], 0], V[eb[m], 1]
-          if (y1 > qy) != (y2 > qy) and qx < x1 + (qy - y1) * (x2 - x1) / (y2 - y1):
-            inside = not inside
-          dx, dy = x2 - x1, y2 - y1
-          u = min(1.0, max(0.0, ((qx - x1) * dx + (qy - y1) * dy) / max(dx * dx + dy * dy, 1e-300)))
-          near = near or (qx - x1 - u * dx) ** 2 + (qy - y1 - u * dy) ** 2 <= eps * eps
-        if near or not inside:
-          ok = False
-          break
-      if ok:
-        out[k] = g
+# whether the segments p1-p2 and a-b meet, touching included; a segment on the line of the other
+# cuts it only where they overlap
+def _cuts(p1x, p1y, p2x, p2y, ax, ay, bx, by):
+  o1 = (bx - ax) * (p1y - ay) - (by - ay) * (p1x - ax)
+  o2 = (bx - ax) * (p2y - ay) - (by - ay) * (p2x - ax)
+  o3 = (p2x - p1x) * (ay - p1y) - (p2y - p1y) * (ax - p1x)
+  o4 = (p2x - p1x) * (by - p1y) - (p2y - p1y) * (bx - p1x)
+  if o1 * o2 > 0 or o3 * o4 > 0:
+    return False
+  if o1 == 0 and o2 == 0:
+    t1 = (ax - p1x) * (p2x - p1x) + (ay - p1y) * (p2y - p1y)
+    t2 = (bx - p1x) * (p2x - p1x) + (by - p1y) * (p2y - p1y)
+    if max(t1, t2) < 0 or min(t1, t2) > (p2x - p1x) ** 2 + (p2y - p1y) ** 2:
+      return False
+  return True
+
+
+# which of the pixels z a boundary segment of its cell slot[z] meets at its nudged unit cell uc,
+# the segments a-b in the cells' lists (first, items); calcgrains._absorbPython is the NumPy form
+def _absorbCrossLoop(z, slot, xy, uc, nrm, h, a, b, first, items, crossed):
+  for t in prange(z.shape[0]):
+    cx, cy = xy[z[t], 0], xy[z[t], 1]
+    for mm in range(first[slot[z[t]]], first[slot[z[t]] + 1]):
+      m = items[mm]
+      if not _separated(cx, cy, a[m, 0], a[m, 1], b[m, 0], b[m, 1], uc, nrm, h):
+        crossed[t] = True
         break
+
+
+# the grains passed along the links: an uncrossed pixel z[t] still at 0 takes the grain of the first
+# neighbour nb[t, k], in the order of k, that has one and whose centre no segment of either cell
+# separates from its own, every link tested once, in sweeps over k until nothing new is given, each
+# sweep over the pixels still open; calcgrains._absorbPython is the NumPy form
+def _absorbLinkLoop(z, slot, nb, xy, a, b, first, items, crossed, out):
+  nz, nk = nb.shape
+  tested = np.zeros((nz, nk), np.bool_)
+  res = np.zeros(nz, np.int64)
+  act = np.empty(nz, np.int64)
+  while True:
+    n = 0
+    for t in range(nz):
+      if not crossed[t] and out[z[t]] == 0:
+        act[n] = t
+        n += 1
+    nNew = 0
+    for k in range(nk):
+      for u in prange(n):
+        t = act[u]
+        p, q = z[t], nb[t, k]
+        res[t] = 0
+        if out[p] != 0 or tested[t, k] or q < 0 or out[q] <= 0:
+          continue
+        tested[t, k] = True
+        cut = False
+        for cell in (slot[p], slot[q]):
+          for mm in range(first[cell], first[cell + 1]):
+            m = items[mm]
+            if _cuts(xy[p, 0], xy[p, 1], xy[q, 0], xy[q, 1], a[m, 0], a[m, 1], b[m, 0], b[m, 1]):
+              cut = True
+              break
+          if cut:
+            break
+        if not cut:
+          res[t] = out[q]
+      for u in range(n):
+        t = act[u]
+        if res[t] > 0:
+          out[z[t]] = res[t]
+          nNew += 1
+    if nNew == 0:
+      break
+
+
+def absorbNumba(z, slot, P, off, xy, uc, nrm, h, a, b, origin, Ainv, mg, sz, out, backend=None):
+  """the absorption of the pixels z written into out through the compiled loops: the neighbours and
+  the cells of interest, the segment lists of the lattice cells, the crossed pixels, the grains passed
+  along the links; False without numba"""
+  loops = [_pixelLoop(f, True, backend) for f in (_absorbCrossLoop, _absorbLinkLoop)]
+  if loops[0] is None:
+    return False
+  nb = np.empty((z.shape[0], off.shape[0]), np.int64)
+  isI = np.zeros(P.shape[0], np.bool_)
+  _COMPILED["_absorbSetupLoop"](z, slot, P, off, nb, isI)
+  first = np.zeros(P.shape[0] + 1, np.int64)
+  items = _COMPILED["_absorbListLoop"](a, b, origin[0], origin[1], Ainv, mg, int(sz[0]), int(sz[1]), isI, first)
+  crossed = np.zeros(z.shape[0], np.bool_)
+  loops[0](z, slot, xy, uc, nrm, h, a, b, first, items, crossed)
+  loops[1](z, slot, nb, xy, a, b, first, items, crossed, out)
+  return True
 
 
 # the stencil steps from the seeds through the mask cells m, layer by layer up to n: a cell reached
@@ -1980,7 +2038,7 @@ def chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, lattice, tol):
   return W
 
 
-_PIXEL_HELPERS = ("_fillAt", "_quadOut", "_absorbBucketsLoop", "_absorbBucketsFill", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_chainsLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
+_PIXEL_HELPERS = ("_fillAt", "_quadOut", "_absorbSetupLoop", "_absorbBox", "_absorbListLoop", "_separated", "_cuts", "_segmentGrid", "_gridCross", "_chainEliminateLoop", "_chainsLoop", "_range", "_closestTo", "_closestAngle", "_neighbour", "_comparable", "_pivot", "_reducedCosts", "_simplexSolve", "_linearProgram",
                   "_choleskySolve", "_centreProgram")
 _PARALLEL_HELPERS = ("_applyOperator", "_chainBackLoop")
 
@@ -2045,7 +2103,7 @@ def _extremalWidthLoop(H, offsets, shortest, longest):
 
 _PIXEL_LOOPS = {"gradient": _gradientLoop, "kam": _kamLoop, "gnd": _gndLoop, "grod": _grodLoop, "window": _windowLoop, "cg": _cgLoop,
                 "residualNorm": _residualNormLoop, "irlsWeights": _irlsWeightsLoop, "tangent": _tangentLoop, "exp": _expLoop,
-                "absorb": _absorbLoop, "fill": _fillLoop, "cut": _cutLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
+                "fill": _fillLoop, "cut": _cutLoop, "sweep": _sweepLoop, "crossing": _crossingLoop, "planeTensor": _planeTensorLoop, "extremalWidths": _extremalWidthLoop, "irlsEnergy": _irlsEnergyLoop}
 
 
 def pixelKernel(name, backend=None):

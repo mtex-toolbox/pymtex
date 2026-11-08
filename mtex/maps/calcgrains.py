@@ -21,7 +21,7 @@ from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
 from .decomposition import decompose, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
-from .kernels import absorbBucketsNumba, edgesByGrainNumba, grainKernel, pixelKernel
+from .kernels import absorbNumba, grainKernel
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 from .straighten import straightenInFill
@@ -72,7 +72,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   if removeQuadruplePoints:
     c, seg = splitQuadruplePoints(c, seg, ebsd, crit)
   grains = grainTable(seg, ebsd, buildBoundary(c, seg, ebsd), buildBoundary(c, seg, ebsd, inner=True))
-  ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, grains.boundary, backend=backend, reach=int(np.ceil(alpha)) + 2).reshape(ebsd.shape)
+  ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, grains.boundary, backend=backend).reshape(ebsd.shape)
   absorbNotIndexed(ebsd, grains)
   return grains
 
@@ -109,70 +109,113 @@ def markUndersized(ebsd, seg, minPixel):
   return bool(under.any())
 
 
-def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None, reach=5):
+def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None):
   """give a grain to the pixels the closing left without a cell of their own
 
-  A filled hole belongs to the cells that grew into it, so a pixel there lies in one grain,
-  in several, or on the boundary between them. The candidates are the grains of the sites
-  nearest to the pixel, and the pixel joins the one whose polygon holds every corner of its
-  footprint, nudged inwards, off its boundary. Zero stays for a pixel a boundary runs through."""
+  A pixel at 0 whose unit cell, pulled towards its centre by nudge, no boundary segment meets
+  takes the grain of a neighbour, sharing an edge or a corner, whose centre no segment separates
+  from its own, and passes it on the same way; zero stays for a pixel a boundary runs through.
+  Every segment is tested only against the pixels of the lattice cells it passes, so nothing is
+  searched. MATLAB's absorbInteriorPixels."""
   out = grainId.copy()
   l = ebsd.lattice
-  if l is None:
+  z = np.flatnonzero((out == 0) & ~ebsd.isPadding.reshape(-1))
+  if l is None or len(z) == 0:
     return out
-  corners = np.ascontiguousarray(nudge * np.asarray(c.unitCell2d(), dtype=float)[:, :2])
-  P = np.ascontiguousarray(l.plane.to2d(ebsd.pos.data.reshape(-1, 3))[:, :2], dtype=float)
-  siteGrain = np.zeros(c.nSites, dtype=np.int32)
-  has = c.site2pixel >= 0
-  siteGrain[has] = grainId[c.site2pixel[has]]
-  todo = np.flatnonzero((out == 0) & ~ebsd.isPadding.reshape(-1))
-  # the segments of every grain, each listed for both its sides, as directed edges ea -> eb
-  V = np.ascontiguousarray(np.asarray(boundary.V, dtype=float)[:, :2])
-  top = int(max(grainId.max(initial=0), boundary.grainId.max(initial=0))) + 1
-  posOf = np.arange(top)
-  posOf[0] = -1
-  edges = edgesByGrainNumba(boundary.F, boundary.grainId, posOf, top)
-  if edges is None:
-    g = boundary.grainId.reshape(-1)
-    order = np.argsort(g, kind="stable")
-    order = order[g[order] > 0]
-    F2 = np.column_stack([boundary.F, boundary.F[:, ::-1]]).reshape(-1, 2)
-    edges = F2[order, 0], F2[order, 1], np.searchsorted(g[order], np.arange(top + 1))
-  ea, eb, segStart = (np.ascontiguousarray(x, dtype=np.int64) for x in edges)
-  s = c.sites
-  args = [todo.astype(np.int64), P, np.ascontiguousarray(l.ij, dtype=np.int64), corners, np.ascontiguousarray(s.lookup, dtype=np.int64),
-          int(s.offset[0]), int(s.offset[1]), np.ascontiguousarray(s.pos[:, :2], dtype=float), siteGrain, reach]
-  eps = 1e-9 * c.dxy
-  # all pixels in one compiled loop, the grains' segments in y buckets of a pixel; its Python form
-  # below as fallback, over all segments of a grain
-  loop = pixelKernel("absorb", backend)
-  if loop is None:
-    _absorbPython(*args, segStart, V, ea, eb, eps, out)
-  else:
-    loop(*args, V, ea, eb, *absorbBucketsNumba(segStart, V, ea, eb, c.dxy, eps), eps, out)
+  # the raster of the lattice slots with a margin of one cell, -1 where the map has no pixel
+  ij = l.ij.astype(np.int64) + 1
+  sz = np.array([ij[:, 0].max() + 2, ij[:, 1].max() + 2])
+  slot = ij[:, 0] * sz[1] + ij[:, 1]
+  P = np.full(sz[0] * sz[1], -1, dtype=np.int64)
+  P[slot] = np.arange(len(slot))
+  xy = np.ascontiguousarray(l.plane.to2d(ebsd.pos.data.reshape(-1, 3))[:, :2], dtype=float)
+  # the slot offsets of the neighbours sharing an edge before those sharing a corner
+  o = np.array([(di, dj) for dj in (-1, 0, 1) for di in (-1, 0, 1)])
+  d = np.linalg.norm(o @ l.A.T, axis=1)
+  o = o[np.argsort(d, kind="stable")][np.sort(d) < 1.5 * l.dxy][1:]
+  off = o[:, 0] * sz[1] + o[:, 1]
+  # the segments, the cells they may meet found by the ideal lattice, their boxes widened by how far the
+  # cell reaches past 1/2, the nudged cell about a centre with its outward edge normals and offsets
+  V, F = np.asarray(boundary.V, dtype=float)[:, :2], np.asarray(boundary.F)
+  a, b = np.ascontiguousarray(V[F[:, 0]]), np.ascontiguousarray(V[F[:, 1]])
+  Ainv = np.ascontiguousarray(np.linalg.inv(l.A), dtype=float)
+  origin = np.asarray(l.origin, dtype=float)
+  corners = np.asarray(c.unitCell2d(), dtype=float)[:, :2]
+  mg = np.abs(corners @ Ainv.T).max(axis=0) - 0.5 + 1e-6
+  uc = nudge * corners
+  e = np.roll(uc, -1, axis=0) - uc
+  nrm = np.column_stack([e[:, 1], -e[:, 0]]) * np.sign(np.sum(e[:, 0] * np.roll(e[:, 1], -1) - e[:, 1] * np.roll(e[:, 0], -1)))
+  h = np.sum(nrm * uc, axis=1)
+  # the compiled loops, or their NumPy form below as fallback and oracle
+  if not absorbNumba(z, slot, P, off, xy, uc, nrm, h, a, b, origin, Ainv, mg, sz, out, backend):
+    _absorbPython(z, slot, P, off, xy, uc, nrm, h, a, b, origin, Ainv, mg, sz, out)
   return out
 
 
-def _absorbPython(todo, P, ij, corners, lookup, off0, off1, sitePos, siteGrain, reach, segStart, V, ea, eb, eps, out):
-  for k in todo:
-    a0, b0 = ij[k, 0] - off0, ij[k, 1] - off1
-    block = lookup[max(0, a0 - reach):a0 + reach + 1, max(0, b0 - reach):b0 + reach + 1].reshape(-1)
-    cand = block[block >= 0]
-    cand = cand[siteGrain[cand] > 0]
-    if len(cand) == 0:
-      continue
-    d = np.sum((sitePos[cand] - P[k]) ** 2, axis=1)
-    for g in siteGrain[cand[d <= d.min() * (1 + 1e-9)]]:
-      S = np.column_stack([V[ea[segStart[g]:segStart[g + 1]]], V[eb[segStart[g]:segStart[g + 1]]]])
-      q = P[k] + corners
-      cross = ((S[:, 1] > q[:, 1, None]) != (S[:, 3] > q[:, 1, None])) & \
-        (q[:, 0, None] < S[:, 0] + (q[:, 1, None] - S[:, 1]) * (S[:, 2] - S[:, 0]) / np.where(S[:, 3] == S[:, 1], 1, S[:, 3] - S[:, 1]))
-      d, t = S[:, 2:] - S[:, :2], q[:, None, :] - S[:, :2]
-      u = np.clip(np.sum(t * d, axis=2) / np.maximum(np.sum(d * d, axis=1), 1e-300), 0, 1)
-      near = np.linalg.norm(t - u[..., None] * d, axis=2).min(axis=1) <= eps
-      if np.all((cross.sum(axis=1) % 2 == 1) & ~near):
-        out[k] = g
-        break
+def _absorbPython(z, slot, P, off, xy, uc, nrm, h, a, b, origin, Ainv, mg, sz, out):
+  # the neighbours of the pixels at 0, -1 for an empty slot, and the cells of interest
+  nb = P[slot[z][:, None] + off]
+  isI = np.zeros(len(P), dtype=bool)
+  isI[slot[z]] = True
+  isI[slot[nb[nb >= 0]]] = True
+  # the segments of every cell of interest, as the cells' starts into the sorted list
+  u1, u2 = (a - origin) @ Ainv.T + 1, (b - origin) @ Ainv.T + 1
+  lo = np.maximum(np.floor(np.minimum(u1, u2) - mg + 0.5), 0).astype(np.int64)
+  hi = np.minimum(np.floor(np.maximum(u1, u2) + mg + 0.5), sz - 1).astype(np.int64)
+  w = hi[:, 0] - lo[:, 0] + 1
+  n = w * (hi[:, 1] - lo[:, 1] + 1)
+  s = np.repeat(np.arange(len(n)), n)
+  r = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n)
+  cell = (lo[s, 0] + r % w[s]) * sz[1] + lo[s, 1] + r // w[s]
+  s, cell = s[isI[cell]], cell[isI[cell]]
+  order = np.argsort(cell, kind="stable")
+  s, cell = s[order], cell[order]
+  first = np.concatenate([[0], np.cumsum(np.bincount(cell, minlength=len(isI)))])
+
+  def segsOf(cells):
+    m = first[cells + 1] - first[cells]
+    i = np.repeat(np.arange(len(cells)), m)
+    return i, s[np.repeat(first[cells], m) + np.arange(m.sum()) - np.repeat(np.cumsum(m) - m, m)]
+
+  # a pixel is crossed where a segment and its nudged cell have no separating axis
+  i, e = segsOf(slot[z])
+  cen, A, B = xy[z[i]], a[e], b[e]
+  d = B - A
+  pr = (cen[:, :1] - A[:, :1] + uc[:, 0]) * d[:, 1:] - (cen[:, 1:] - A[:, 1:] + uc[:, 1]) * d[:, :1]
+  pa = (A[:, :1] - cen[:, :1]) * nrm[:, 0] + (A[:, 1:] - cen[:, 1:]) * nrm[:, 1]
+  pb = (B[:, :1] - cen[:, :1]) * nrm[:, 0] + (B[:, 1:] - cen[:, 1:]) * nrm[:, 1]
+  sep = np.all(pr > 0, axis=1) | np.all(pr < 0, axis=1) | np.any((pa > h) & (pb > h), axis=1)
+  crossed = np.zeros(len(z), dtype=bool)
+  crossed[i[~sep]] = True
+  # the grain passes along every link no segment of its two cells cuts
+  u = np.flatnonzero(~crossed)
+  tested = np.zeros((len(u), nb.shape[1]), dtype=bool)
+  while True:
+    nNew = 0
+    for k in range(nb.shape[1]):
+      j = np.flatnonzero((out[z[u]] == 0) & ~tested[:, k] & (nb[u, k] >= 0))
+      j = j[out[nb[u[j], k]] > 0]
+      tested[j, k] = True
+      p, q = z[u[j]], nb[u[j], k]
+      i, e = segsOf(np.concatenate([slot[p], slot[q]]))
+      i = i % len(p)
+      cut = np.zeros(len(p), dtype=bool)
+      cut[i[_cutsNumpy(xy[p[i]], xy[q[i]], a[e], b[e])]] = True
+      out[p[~cut]] = out[q[~cut]]
+      nNew += int((~cut).sum())
+    if nNew == 0:
+      break
+
+
+# whether the segments p1-p2 and a-b meet, touching included; a segment on the line of the other
+# cuts it only where they overlap
+def _cutsNumpy(p1, p2, a, b):
+  cr = lambda u, v: u[:, 0] * v[:, 1] - u[:, 1] * v[:, 0]
+  o1, o2 = cr(b - a, p1 - a), cr(b - a, p2 - a)
+  o3, o4 = cr(p2 - p1, a - p1), cr(p2 - p1, b - p1)
+  t = np.column_stack([np.sum((a - p1) * (p2 - p1), axis=1), np.sum((b - p1) * (p2 - p1), axis=1)])
+  apart = (o1 == 0) & (o2 == 0) & ((t.max(axis=1) < 0) | (t.min(axis=1) > np.sum((p2 - p1) ** 2, axis=1)))
+  return (o1 * o2 <= 0) & (o3 * o4 <= 0) & ~apart
 
 
 def grainTable(seg, ebsd, boundary=None, innerBoundary=None, backend=None):
