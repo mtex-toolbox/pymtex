@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 
 from .decomposition import cellComplex
-from .kernels import adjacencyNumba, chainDPNumba, chainSolveNumba, chainsNumba, farthestOfChainsNumba, pixelKernel, segmentGridNumba
+from .kernels import adjacencyNumba, chainSolveNumba, farthestOfChainsNumba, pixelKernel, segmentGridNumba
 from .segment import segmentation
 
 # the pinning rule under study: True holds, of a chain of free vertices with a segment that
@@ -23,13 +23,6 @@ from .segment import segmentation
 # as Douglas-Peucker, instead of both ends of every such segment; it changes the result and
 # leaves the parity with MATLAB develop, so it stays off
 PIN_FARTHEST = False
-# the second rule under study: True keeps the first solve for the junctions, holds them there and
-# straightens every chain of degree-two vertices between them on its own, Douglas-Peucker on its
-# chord (straightenChains); it changes the result too, so it stays off
-CHAIN_DP = False
-# with CHAIN_DP, the junctions solved once more after the chain pass, the pinned vertices held,
-# and the chains whose ends moved done again
-CHAIN_DP_RESOLVE = False
 
 
 def straightenInFill(c, seg):
@@ -43,45 +36,50 @@ def straightenInFill(c, seg):
   V, F, cells, isB = c.V.astype(float), c.F, c.cells, seg.isOuter.copy()
 
   # the fill test at every boundary vertex once
-  FB = F[isB]
   used = np.zeros(len(V), dtype=bool)
-  used[FB] = True
+  used[F[isB]] = True
   dV = np.full(len(V), np.nan)
   dV[used] = inFill(V[used])
-  # a boundary segment entering the filled cells gets a vertex there, by bisection
-  d0, d1 = dV[FB[:, 0]], dV[FB[:, 1]]
-  cut = np.flatnonzero(isB)[(np.maximum(d0, d1) > tol) & (np.minimum(d0, d1) < -tol)]
-  a, b = np.ascontiguousarray(V[F[cut, 0]]), np.ascontiguousarray(V[F[cut, 1]])
+  # a boundary segment gets a vertex where it enters the filled cells, by bisection, twice, so the
+  # pieces are cut again; src is the face every face was cut from
   loop = pixelKernel("cut") if inFill.rigid else None
-  if loop is not None:
-    t = np.empty((len(cut), 1))
-    loop(a, b, *inFill.lattice, t[:, 0])
-  else:
-    lo, hi = np.zeros((len(cut), 1)), np.ones((len(cut), 1))
-    aIn = dV[F[cut, 0]] > 0
-    for _ in range(16):
-      mid = (lo + hi) / 2
-      isA = (inFill(a + mid * (b - a)) > 0) == aIn
-      lo[isA], hi[~isA] = mid[isA], mid[~isA]
-    t = (lo + hi) / 2
-  nV = len(V)
-  new = nV + np.arange(len(cut))
-  V = np.vstack([V, a + t * (b - a)])
-  dV = np.concatenate([dV, inFill(V[nV:])])
-  # the cut faces end at the new vertices, the new faces continue to their old ends
-  at = np.cumsum(isB)[cut] - 1
-  tail = FB[at, 1].copy()
-  FB[at, 1] = new
-  F = np.vstack([F, np.column_stack([new, tail])])
-  F[cut, 1] = new
-  cells = np.vstack([cells, cells[cut]])
-  isB = np.concatenate([isB, np.ones(len(cut), dtype=bool)])
+  src, look = np.arange(len(F)), isB.copy()
+  for _ in range(2):
+    L = np.flatnonzero(look)
+    d0, d1 = dV[F[L, 0]], dV[F[L, 1]]
+    isC = (np.maximum(d0, d1) > tol) & (np.minimum(d0, d1) < -tol)
+    k = ~isC & (np.maximum(d0, d1) > tol)
+    c2, a2, b2 = fillEntry(V, F, L[k], d0[k], inFill, tol, dxy)
+    cut = np.concatenate([L[isC], c2])
+    a, b = np.vstack([V[F[L[isC], 0]], a2]), np.vstack([V[F[L[isC], 1]], b2])
+    if loop is not None:
+      t = np.empty((len(cut), 1))
+      loop(a, b, *inFill.lattice, t[:, 0])
+    else:
+      lo, hi = np.zeros((len(cut), 1)), np.ones((len(cut), 1))
+      aIn = inFill(a) > 0
+      for _ in range(16):
+        mid = (lo + hi) / 2
+        isA = (inFill(a + mid * (b - a)) > 0) == aIn
+        lo[isA], hi[~isA] = mid[isA], mid[~isA]
+      t = (lo + hi) / 2
+    nV, nF = len(V), len(F)
+    new = nV + np.arange(len(cut))
+    V = np.vstack([V, a + t * (b - a)])
+    dV = np.concatenate([dV, inFill(V[nV:])])
+    # the cut faces end at the new vertices, the new faces continue to their old ends
+    F = np.vstack([F, np.column_stack([new, F[cut, 1]])])
+    F[cut, 1] = new
+    src, isB = np.concatenate([src, src[cut]]), np.concatenate([isB, np.ones(len(cut), dtype=bool)])
+    look = np.zeros(len(F), dtype=bool)
+    look[cut] = look[nF:] = True
+  cells = cells[src]
 
   # the boundary vertices alone, numbered from 0 in e in the order of V
-  used = np.concatenate([used, np.ones(len(cut), dtype=bool)])
+  used = np.concatenate([used, np.ones(len(V) - len(used), dtype=bool)])
   vB = np.flatnonzero(used)
   renum = np.cumsum(used, dtype=np.int64) - 1
-  e = np.vstack([renum[FB], np.column_stack([renum[new], renum[tail]])])
+  e = renum[F[isB]]
   from scipy.sparse.csgraph import connected_components
   nB, m = len(vB), len(e)
   # the half edges by their first vertex: the segment and the neighbour of each, counting sorted
@@ -106,9 +104,6 @@ def straightenInFill(c, seg):
       moved.append(mi[(Wm[:, 0] != W[mi, 0]) | (Wm[:, 1] != W[mi, 1])])
       W[mi] = Wm
       lab[mi] = connected_components(M, directed=False)[1] + lab.max() + 1
-      if CHAIN_DP:
-        W = straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, deg, loc, dxy, inFill, tol, box)
-        break
     moved = np.concatenate(moved)
     isM = np.zeros(m, dtype=bool)
     isM[hseg[_ranges(ptr, moved)]] = True
@@ -133,9 +128,8 @@ def straightenInFill(c, seg):
     mi = np.flatnonzero(hit[lab + 1] & ~isFixed)
   V0, V = V, V.copy()
   V[vB] = W
-  split = lambda x: np.concatenate([x, x[cut]])
   return (cellComplex(V.astype(c.V.dtype, copy=False), F.astype(c.F.dtype, copy=False), cells, c.sites, c.A, c.plane, c.shape, V0.astype(c.V.dtype, copy=False)),
-          segmentation(grainId, seg.nGrains, split(seg.connect), split(seg.isInner), split(seg.isOuter)))
+          segmentation(grainId, seg.nGrains, seg.connect[src], seg.isInner[src], seg.isOuter[src]))
 
 
 def solveFree(mi, W0, isFixed, ptr, nbr, deg, loc, chains=False):
@@ -161,71 +155,6 @@ def solveFree(mi, W0, isFixed, ptr, nbr, deg, loc, chains=False):
   return (Wm[0], M, Wm[1:]) if chains else (Wm, M, None)
 
 
-def straightenChains(W0, W, isFixed, e, ptr, hseg, nbr, deg, loc, dxy, inFill, tol, box):
-  """the vertices under CHAIN_DP: the free junctions held where the first solve put them, every
-  chain of degree-two vertices between held vertices straightened on its own (chainDPNumba); a
-  junction whose segment to a decided vertex sweeps out of the fill goes back and its chains are
-  done again, and so are the chains of a segment that crosses another, its vertices pinned"""
-  chainPtr, chainV, chainS = chainsNumba(ptr, hseg, nbr, isFixed)
-  nB, m = len(W0), len(e)
-  ends = np.column_stack([chainV[chainPtr[:-1]], chainV[chainPtr[1:] - 1]])
-  inner = np.ones(len(chainV), dtype=bool)
-  inner[chainPtr[:-1]] = inner[chainPtr[1:] - 1] = False
-  segChain, k = np.full(m, -1, dtype=np.int64), chainS >= 0
-  segChain[chainS[k]] = np.repeat(np.arange(len(chainPtr) - 1), np.diff(chainPtr))[k]
-  pin, reset = np.zeros(nB, dtype=bool), np.zeros(nB, dtype=bool)
-  chainsOf = lambda v: np.flatnonzero(np.isin(ends, v).any(axis=1))
-  segmentsOf = lambda cs: chainS[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr))]
-
-  # the chains cs straightened, a junction whose segment to a decided vertex sweeps out put back,
-  # held, and its chains done again without their pins, until none is
-  def settle(cs):
-    while len(cs):
-      chainDPNumba(chainPtr, chainV, cs, W0, W, pin, reset, dxy, inFill.lattice, tol)
-      r = np.flatnonzero(reset)
-      if not len(r):
-        return
-      W[r], isFixed[r], reset[r] = W0[r], True, False
-      cs = chainsOf(r)
-      pin[chainV[np.repeat(np.isin(np.arange(len(chainPtr) - 1), cs), np.diff(chainPtr)) & inner]] = False
-
-  settle(np.arange(len(chainPtr) - 1))
-  if CHAIN_DP_RESOLVE:
-    # the junctions once more, the pinned vertices held, and the chains whose ends moved by more
-    # than the fill tolerance again
-    held = isFixed | pin
-    mi = np.flatnonzero(~held)
-    Wm = solveFree(mi, W0, held, ptr, nbr, deg, loc)[0]
-    isEnd = np.zeros(nB, dtype=bool)
-    isEnd[ends] = True
-    j, Wj = mi[isEnd[mi]], Wm[isEnd[mi]]
-    movedEnd = np.abs(Wj - W[j]).max(axis=1) > tol
-    j = j[movedEnd]
-    W[j] = Wj[movedEnd]
-    settle(chainsOf(j))
-  # the crossings of the segments moved, then of the chains done again; both segments of a
-  # crossing keep their vertices, pinned in a chain, held as a junction
-  moved = (W[:, 0] != W0[:, 0]) | (W[:, 1] != W0[:, 1])
-  q, grids = np.flatnonzero(moved[e[:, 0]] | moved[e[:, 1]]), []
-  while len(q):
-    partner, grids = crossing(W, e, q, 2 * dxy, box, grids, q, partner=True)
-    isX = partner >= 0
-    if not isX.any():
-      break
-    isX[partner[isX]] = True
-    v = e[isX].reshape(-1)
-    j = v[~np.isin(v, chainV[inner])]
-    W[j], isFixed[j] = W0[j], True
-    pin[v] = True
-    W[v] = W0[v]
-    cs = np.unique(np.concatenate([segChain[isX], chainsOf(j)]))
-    cs = cs[cs >= 0]
-    settle(cs)
-    q = segmentsOf(cs)
-    q = q[q >= 0]
-  return W
-
-
 def pinFarthest(eb, chains, loc, mi, W, W0):
   """the vertices to hold for the bad segments eb under PIN_FARTHEST: of every chain one of them
   touches, the vertex whose old position lies farthest from the chord through the solved ends,
@@ -236,6 +165,23 @@ def pinFarthest(eb, chains, loc, mi, W, W0):
   cs = np.unique(c[c >= 0])
   v = farthestOfChainsNumba(cs, first, last, prv, mi, W, W0)
   return np.concatenate([v, eb[np.all(c < 0, axis=1)].reshape(-1)])
+
+
+def fillEntry(V, F, k, d0, inFill, tol, dxy):
+  """of the segments k with an end inside the fill (d0 the fill test at their first) those that
+  leave it in between: that end, the first if both are, and the sample outside nearest to it,
+  samples a third of a pixel apart"""
+  in1 = (d0 > tol)[:, None]
+  a = np.where(in1, V[F[k, 0]], V[F[k, 1]])
+  b = np.where(in1, V[F[k, 1]], V[F[k, 0]])
+  T = np.maximum(2, np.ceil(3 * np.linalg.norm(b - a, axis=1) / dxy)).astype(np.int64)
+  s = np.repeat(np.arange(len(k)), T - 1)
+  t = (np.arange(1, len(s) + 1) - np.repeat(np.cumsum(T - 1) - (T - 1), T - 1)) / T[s]
+  isO = inFill(a[s] + t[:, None] * (b[s] - a[s])) < -tol
+  tm = np.full(len(k), np.inf)
+  np.minimum.at(tm, s[isO], t[isO])
+  o = np.isfinite(tm)
+  return k[o], a[o], a[o] + tm[o, None] * (b[o] - a[o])
 
 
 def sweepsOut(V0, V, em, dxy, inFill, tol):
@@ -265,9 +211,8 @@ def _ranges(ptr, v):
   return np.repeat(ptr[v] - np.cumsum(n) + n, n) + np.arange(n.sum())
 
 
-def crossing(V, e, q, h, box, grids=(), moved=None, partner=False):
-  """the segments q of e that cross another one of e properly, without a common vertex (with
-  partner=True the one each crosses, -1 for none), and the
+def crossing(V, e, q, h, box, grids=(), moved=None):
+  """the segments q of e that cross another one of e properly, without a common vertex, and the
   grids of spacing h over box the compiled test lists the segments in: the ones given, the first
   of every segment where it was when it was built, the others of the segments moved in a round,
   where they were then, and one more of the segments moved now, each over the cells the segments
@@ -282,7 +227,7 @@ def crossing(V, e, q, h, box, grids=(), moved=None, partner=False):
     if len(q):
       loop(np.ascontiguousarray(V), np.ascontiguousarray(e, dtype=np.int64), q, x0, y0, h, int(ny), np.vstack([g[0] for g in grids]),
            np.concatenate([g[1] for g in grids]), ioff, isX)
-    return (isX if partner else isX >= 0), grids
+    return isX >= 0, grids
   isX = isX >= 0
   if len(q) == 0:
     return isX, grids

@@ -431,6 +431,22 @@ small 0.013 s either way, peridotite 0.021 / 0.040 / 0.104 -> 0.009 / 0.009 / 0.
 (612 624 pixels at 0, 1 194 112 segments, 4.7 million listings, 420 201 pixels crossed). bayes was not
 reachable on 2026-11-08; its table is to come (`bayes_jobAbsorb.sh` beside the earlier jobs).
 
+### The cut at the fill entry, the one rule in both ports, 2026-11-08
+
+Ralf chose the cut at the fill entry over `CHAIN_DP`; `CHAIN_DP`, `CHAIN_DP_RESOLVE` and their kernels
+are gone. The cut runs twice: a boundary segment is cut where the fill test changes sign between its ends,
+and one with an end inside the fill and the other not outside it is cut at the first sample outside, a
+third of a pixel apart, from that end (`fillEntry`); the pieces are tested once more. This frees the inside
+ends of the 39 000 faces above. MATLAB develop has the same rule in `straightenInFill.m`.
+
+Against the rule before, in MATLAB: calcGrains time unchanged within the noise (forsterite 1.53-1.74 s
+either way, alternating calls), boundary length -0.79 % on 1C_1 (162 566 -> 161 286 µm), -0.80 % on
+forsterite, -0.13 to -0.16 % on peridotite; grain counts and every indexed pixel's grain unchanged, notIndexed
+pixels absorbed and released (1C_1 +6381 -8216, forsterite +375 -325). The ports agree on the total boundary
+length to 0.04-0.12 µm on 1C_1, forsterite and peridotite at alpha 2.8, 10 and 16.1; `calcgrains_ops.py`
+on its six measured ops gives the same grain and segment counts and the same largest endpoint deviation as
+before the change (1.5e-3 to 3.7e-3).
+
 ## MATLAB defects found on the way
 
 Rechecked on MTEX's own sample data (`bench/matlab/probe_calcgrains_bugs.m`), one of the three
