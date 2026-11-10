@@ -263,10 +263,11 @@ def test_the_default_angle_is_matlabs_15_degrees():
 
 @pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")
 def test_the_default_reconstruction_of_csl_is_matlabs():
-  # MATLAB's calcGrains(ebsd) on the csl map, 15 degrees: 885 grains (calcgrains-release-audit.md)
+  # MATLAB develop's calcGrains(ebsd) on the csl map, 15 degrees: 841 grains, 885 with the
+  # quadruple points kept
   from mtex import mtexdata
   ebsd = mtexdata("csl", root=LOCAL, download=False)
-  assert len(calcGrains(ebsd)) == 885
+  assert len(calcGrains(ebsd.copy())) == 841 and len(calcGrains(ebsd, removeQuadruplePoints=False)) == 885
 
 
 @pytest.mark.skipif(not os.path.isdir(os.path.join(LOCAL, "EBSD")), reason="the MTEX data folder is not here")

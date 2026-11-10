@@ -36,6 +36,23 @@ map, grain by grain and pixel by pixel (`bench/calcgrains_ops.py`); the map,
 `mtexdata('peridotite')`, is new, and the page [Cracks and Pores](https://mtex-toolbox.github.io/GrainReconstructionCracks_py.html)
 shows the kinds on it.
 
+### Quadruple points resolved, small grains kept whole
+
+Two pixels of one orientation that touch only at a corner share no boundary segment, so the
+criterion never compared them and each was a grain of its own. `calcGrains` now splits every
+point where four boundary segments meet into two triple points by default, joining the diagonal
+pair whose pixels the criterion connects and that lie in two grains, so that the grains merge;
+a point where neither diagonal passes the criterion stays. The two triple points sit a quarter
+of a pixel apart, so the joined pixels meet along a neck rather than a pinch and no segment of
+zero length remains. `removeQuadruplePoints=False` keeps the four-way contacts. On MTEX's sample
+maps this gives MATLAB develop's grains pixel for pixel: forsterite 3102 to 2855 grains, twins at
+15 degree 121 to 95, csl 885 to 841.
+
+`smoothBoundary` gives every grain its measured area back after the filter, since the Taubin
+pairs shrink a loop of few vertices to a fraction, and keeps every vertex of a grain of fewer
+than 14 boundary vertices through the simplification, as `simplifyBoundary` does. A grain of a
+few pixels ends within a few percent of the area it was measured with.
+
 ### Faster grain reconstruction
 
 Grain reconstruction runs substantially faster in our benchmarks against MATLAB,

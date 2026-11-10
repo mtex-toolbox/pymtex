@@ -34,7 +34,7 @@ from .straighten import straightenInFill
 
 
 def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=None, alphaPore=np.inf, alphaPocket=None,
-               alphaCrack=0, kinds=None, delaunay=False, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None,
+               alphaCrack=0, kinds=None, delaunay=False, removeQuadruplePoints=True, mcl=None, fmc=None, verbose=False, backend=None,
                grainId=False, straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
@@ -43,7 +43,9 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   close the notIndexed regions of that kind (notIndexedKinds) in place of alpha, by default inf,
   alpha and 0, so a pore is part of its grain and a crack stays open; kinds hands the kind of
   every pixel back, edited or not; straighten draws the boundaries through
-  the filled cells straight (False: along the bisectors between the pixels around them), mcl and
+  the filled cells straight (False: along the bisectors between the pixels around them);
+  removeQuadruplePoints splits every point where four pixels of a square grid meet into two
+  triple points, joining the diagonal pair that merges two grains (False keeps them); mcl and
   fmc select Markov clustering and fast multiscale clustering, grainId=True joins the pixels of
   one grain id stored with the map, ebsd.prop['grainId']. The map keeps the grain ids"""
   if isinstance(angle, grainBoundaryCriterion):
@@ -83,7 +85,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   # the diagonal ambiguity is decided on the map the grains are built from, so the split
   # runs after the cull and before anything reads the boundary
   if removeQuadruplePoints:
-    c, seg = splitQuadruplePoints(c, seg, ebsd, crit)
+    c, seg = splitQuadruplePoints(c, seg, ebsd, crit, backend)
   grains = grainTable(seg, ebsd, buildBoundary(c, seg, ebsd), buildBoundary(c, seg, ebsd, inner=True))
   checkClosed(grains.boundary)
   ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, grains.boundary, backend=backend).reshape(ebsd.shape)

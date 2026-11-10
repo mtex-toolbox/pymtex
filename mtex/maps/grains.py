@@ -828,7 +828,7 @@ class grain2d(polygonSet):
   # declared for the editor: the methods other modules attach (tools/staticapi.py)
   if TYPE_CHECKING:
     from .boundaryresampling import (_reduceGrains as reduceBoundary, _simplifyGrains as simplifyBoundary,
-                                     _refineGrains as refineBoundary, sharedVertices)
+                                     _refineGrains as refineBoundary, sharedVertices, smallGrainVertices)
     from .smoothing import smoothBoundary
     from .shape import _hullGrains as hull, characteristicShape
     from .traces import calcTraces

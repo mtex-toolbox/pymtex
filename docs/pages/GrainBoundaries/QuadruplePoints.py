@@ -15,9 +15,9 @@
 # digital-topology ambiguity introduced by sampling. In three dimensions, a physical
 # quadruple point has a different meaning.
 #
-# The `removeQuadruplePoints` option to [calcGrains](EBSD.calcGrains.html) resolves this
-# ambiguity during reconstruction. This page assumes the reconstruction concepts
-# introduced in [Grain Reconstruction](GrainReconstruction.html).
+# [calcGrains](EBSD.calcGrains.html) resolves this ambiguity during reconstruction, and
+# `removeQuadruplePoints=False` keeps the four-way contacts. This page assumes the
+# reconstruction concepts introduced in [Grain Reconstruction](GrainReconstruction.html).
 
 import numpy as np
 from mtex import *
@@ -58,12 +58,12 @@ plot(ebsd, ebsdColors, micronbar='off')
 
 # ## Reconstruct without resolving the junction
 #
-# Ordinary reconstruction closes the oriented ring at the diagonal contact. It then treats
-# the identity-oriented interior and exterior as separate grains, so the map contains
-# three grains rather than two.
+# With the quadruple points kept, the reconstruction closes the oriented ring at the
+# diagonal contact. It then treats the identity-oriented interior and exterior as separate
+# grains, so the map contains three grains rather than two.
 
 # +
-grainsWithQuadruple = calcGrains(ebsd, angle=10 * degree)
+grainsWithQuadruple = calcGrains(ebsd, angle=10 * degree, removeQuadruplePoints=False)
 
 print(f'ordinary reconstruction: {len(grainsWithQuadruple)} grains')
 
@@ -79,12 +79,13 @@ hold(False)
 
 # ## Resolve the junction during reconstruction
 #
-# The `removeQuadruplePoints` option selects the other diagonal. It keeps the like-oriented
-# interior and exterior connected; the ring pixels were already connected to each other
+# By default `calcGrains` joins the diagonal pair whose pixels lie in two grains the
+# criterion connects, so that joining them merges the grains: here the like-oriented
+# interior and exterior, since the ring pixels were already connected to each other
 # elsewhere. The expected two grains remain.
 
 # +
-grains = calcGrains(ebsd, angle=10 * degree, removeQuadruplePoints=True)
+grains = calcGrains(ebsd, angle=10 * degree)
 
 print(f'resolved reconstruction: {len(grains)} grains')
 print(f'total boundary length: {np.sum(grainsWithQuadruple.boundary.segLength):g} before, '
@@ -98,22 +99,22 @@ plot(grains.boundary, lineWidth=2)
 hold(False)
 # -
 
-# The interior outline has joined the exterior network, while the boundary segments and
-# their total length are unchanged. Only their connectivity at the critical vertex
-# differs.
-#
-# The option replaces the four-segment vertex with two coincident three-segment junctions.
-# In this two-grain example they are not strict *triple points*, because a triple point
+# The interior outline has joined the exterior network. The four-segment vertex has become
+# two three-segment junctions a quarter of a pixel apart, each moved an eighth of a pixel
+# into the wedge of the cell it was not joined to, so the two joined pixels meet along a
+# narrow neck and the total boundary length changes by a fraction of a pixel. In this
+# two-grain example the junctions are not strict *triple points*, because a triple point
 # must separate three distinct real grains. See [Triple Points](TriplePoints.html) for
-# that distinction.
+# that distinction. A contact whose both diagonals the criterion separates stays a
+# quadruple point.
 
-# ## Separate the coincident junctions for display
+# ## Smooth the opened contact
 #
-# The two replacement junctions initially have identical coordinates.
 # [smoothBoundary](grain2d.smoothBoundary.html) moves every interior junction within the
-# square of the pixel centres around it, so the two points can move apart. Its default
+# square of the pixel centres around it, so the neck widens into a smooth waist. Its default
 # [taubinFilter](taubinFilter.html) suppresses the pixel staircase while limiting the
-# systematic area loss of Laplacian smoothing.
+# systematic area loss of Laplacian smoothing, and every grain is given its measured area
+# back afterwards.
 
 # +
 grains = smoothBoundary(grains)
@@ -122,8 +123,8 @@ grainColors = colorKey.orientation2color(grains.meanOrientation)
 plot(grains, grainColors, lineWidth=2, micronbar='off')
 # -
 
-# The coincident contact has opened into a narrow neck. Smoothing has moved the geometry
-# for display; it did not perform the topological correction.
+# The contact has opened into a waist. Smoothing moves the geometry; the topological
+# correction was made in the reconstruction.
 
 # ## Curvature at the opened contact
 #

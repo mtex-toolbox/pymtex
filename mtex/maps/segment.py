@@ -3,6 +3,7 @@
 #   segment(c, ebsd, crit)            the criterion on every face, and the grains it leaves joined
 #   faceConnectivity(c, ebsd, crit)   the criterion on every face of the complex
 #   segmentFrom(c, ebsd, connect)     the segmentation of a complex whose criterion is evaluated
+#   mergeAcross(seg, c, i, j, connect)  the grains merged across faces appended to the complex
 #   components(n, a, b)               the connected components of a graph, by union-find
 #
 # The criterion answers per face of the complex; the faces it does not separate are the
@@ -75,6 +76,27 @@ def segmentFrom(c, ebsd, connect, backend=None, mcl=None):
   outside = (p1 < 0) | (p2 < 0)
   isOuter = (outside & ((p1 >= 0) | (p2 >= 0))) | (~outside & (g1 != g2))
   isInner = ~outside & (g1 == g2) & (cut if mcl is not None else connect <= 0.5)
+  return segmentation(grainId, nGrains, connect, isInner, isOuter)
+
+
+def mergeAcross(seg, c, i, j, connect, backend=None):
+  """the segmentation of the complex c, which has one face per measurement pair (i, j) appended to
+  the segmented one, the criterion on them being connect: the grains of every pair it connects
+  are merged and numbered again by first appearance, and a face between two grains now one is no
+  longer a boundary, an inner one where the criterion was weak"""
+  gid = seg.grainId
+  connect = np.asarray(connect, dtype=float)
+  join = connect > 0
+  root = components(seg.nGrains + 1, gid[i[join]], gid[j[join]], backend)
+  grainId, nGrains = relabel(root[gid], gid > 0, backend)
+  isOuter = np.concatenate([seg.isOuter, grainId[i] != grainId[j]])
+  isInner = np.concatenate([seg.isInner, (grainId[i] == grainId[j]) & (connect <= 0.5)])
+  connect = np.concatenate([seg.connect, connect])
+  f = np.flatnonzero(seg.isOuter)
+  p1, p2 = c.site2pixel[c.cells[f, 0]], c.site2pixel[c.cells[f, 1]]
+  same = f[(p1 >= 0) & (p2 >= 0) & (_gather(grainId, p1, 0) == _gather(grainId, p2, 0))]
+  isOuter[same] = False
+  isInner[same] = connect[same] <= 0.5
   return segmentation(grainId, nGrains, connect, isInner, isOuter)
 
 

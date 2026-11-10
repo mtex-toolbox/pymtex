@@ -4,6 +4,8 @@ import pytest
 
 from mtex import EBSD, phaseList, crystalFrame, rotation, zvector, degree, calcGrains, smoothBoundary
 from mtex import boundaryNetwork, laplaceFilter, taubinFilter, curvatureFilter, huberFilter, boundaryFilter
+from mtex.maps.smoothing import restoreArea
+from mtex.maps.polygon import signedArea2
 from conftest import close
 from test_boundary import boundaryMap, SQ4
 
@@ -184,3 +186,34 @@ def test_every_row_of_the_laplacian_sums_to_zero():
   net = boundaryNetwork.byArrays([0, 2, 4, 6], [1, 2, 0, 2, 0, 1], [False] * 3, [0, 1, 2])
   L = net.laplacian().toarray()
   assert np.allclose(L.sum(axis=1), 0) and np.allclose(np.diag(L), -1)
+
+
+# an 11 x 11 map of four quadrants 20 degrees apart with the pixels of mask, inside the first
+# quadrant, turned by 80 degrees
+def islandMap(mask):
+  i, j = np.meshgrid(np.arange(11), np.arange(11), indexing="xy")
+  i, j = i.reshape(-1), j.reshape(-1)
+  pos = np.stack([i, j, np.zeros(121)], axis=-1).astype(float)
+  rot = rotation.byAxisAngle(zvector, np.where(mask(i, j), 80.0, 20.0 * ((i >= 5) + 2 * (j >= 5))) * degree)
+  return EBSD(pos, rot, np.ones(121, dtype=np.int8), phaseList(crystalFrame("1", mineral="test")))
+
+
+def test_the_area_restoration_scales_a_shrunk_loop_back():
+  V = 0.7 * np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+  W = restoreArea(V, [[np.arange(4)]], np.array([1.0]), np.zeros(4, dtype=bool), 1.0)
+  assert close(signedArea2(W) / 2, 1.0, tol=1e-9) and close(W.mean(axis=0), V.mean(axis=0), tol=1e-12)
+
+
+def test_a_grain_of_a_few_pixels_keeps_its_measured_area():
+  for mask, area in ((lambda i, j: (i == 2) & (j == 2), 1.0), (lambda i, j: ((i == 2) & (j >= 1) & (j <= 3)) | ((i == 3) & (j == 2)), 4.0)):
+    g = calcGrains(islandMap(mask), angle=10 * degree)
+    small = np.argmin(g.numPixel)
+    assert close(g.area[small], area, tol=1e-9)
+    assert abs(g.smoothBoundary().area[small] - area) < 0.02 * area and abs(g.smoothBoundary(taubinFilter(5)).area[small] - area) < 0.02 * area
+
+
+def test_a_grain_of_fewer_than_14_vertices_keeps_every_one_through_the_smoothing():
+  g = calcGrains(islandMap(lambda i, j: (i >= 1) & (i <= 3) & (j >= 1) & (j <= 2)), angle=10 * degree)
+  small = g.id[np.argmin(g.numPixel)]
+  segments = lambda gr: np.count_nonzero((gr.boundary.grainId == small).any(axis=1))
+  assert segments(g) == 10 and segments(g.smoothBoundary()) == 10

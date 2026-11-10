@@ -27,7 +27,7 @@ from .grain3d import grain3d
 
 
 def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=None, alphaPore=np.inf, alphaPocket=None,
-               alphaCrack=0, kinds=None, delaunay=False, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None,
+               alphaCrack=0, kinds=None, delaunay=False, removeQuadruplePoints=True, mcl=None, fmc=None, verbose=False, backend=None,
                grainId=False, straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps; MATLAB's
   grain reconstruction from 2d and 3d EBSD data
@@ -94,8 +94,9 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     straighten - draw the boundaries through the filled cells as straight lines (True), or
         along the bisectors between the measured pixels around them (map of the plane)
     removeQuadruplePoints - split every point where four pixels of a square grid meet into
-        two triple points, joining the diagonal pair the criterion connects more (map of
-        the plane)
+        two triple points a quarter pixel apart, joining the diagonal pair that merges two
+        grains, else the pair the criterion connects more; a point where neither diagonal
+        passes the criterion stays; False keeps them all (map of the plane)
     mcl - (p, maxIter), Markov clustering of the links between the pixels before the grains
         are formed, the inflation power p (1.4 in MATLAB) and the number of iterations (4);
         with a soft criterion it merges grains a hard threshold would split (map of the plane)
@@ -144,7 +145,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, alphaPore, alphaPocket, alphaCrack, kinds, delaunay,
                          removeQuadruplePoints, mcl, fmc, verbose, backend, grainId, straighten)
   planar = {"alpha": alpha is not None, "alphaPore": alphaPore != np.inf, "alphaPocket": alphaPocket is not None, "alphaCrack": alphaCrack != 0,
-            "kinds": kinds is not None, "delaunay": delaunay, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints,
+            "kinds": kinds is not None, "delaunay": delaunay, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints is not True,
             "mcl": mcl is not None, "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
   if any(planar.values()):
     raise TypeError(f"calcGrains of a map of volumes takes no {', '.join(k for k, v in planar.items() if v)}")

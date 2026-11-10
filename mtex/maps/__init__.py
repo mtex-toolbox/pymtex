@@ -14,7 +14,7 @@ from .grains import grain2d
 from .calcgrains import calcGrains, notIndexedKinds
 from .boundaryresampling import mustKeep, mergeRuns, sharedVertices
 from .smoothing import (boundaryFilter, laplaceFilter, taubinFilter, curvatureFilter, huberFilter, boundaryNetwork,
-                        pixelCells)
+                        pixelCells, restoreArea)
 from .shape import shape2d, polygonMoments
 from .traces import calcTraces
 from .intragranular import neighbourBall
@@ -38,10 +38,10 @@ __all__ = ["phaseList", "phaseColorNames", "colorTriplet", "lattice", "mapPlane"
            "gbcCustom", "connectivity", "gbcFMC", "grainBoundary", "triplePointList", "triplePoints", "chainOrder",
            "grain2d", "calcGrains", "notIndexedKinds", "mustKeep", "mergeRuns", "sharedVertices", "boundaryFilter",
            "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells",
-           "shape2d", "polygonMoments", "calcTraces", "neighbourBall", "parentGrainReconstructor", "voteTable",
-           "majorityVote", "mclComponents", "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList", "rescale",
-           "imboxfilt", "edgeMap", "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent", "shift",
-           "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip",
+           "restoreArea", "shape2d", "polygonMoments", "calcTraces", "neighbourBall", "parentGrainReconstructor",
+           "voteTable", "majorityVote", "mclComponents", "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList",
+           "rescale", "imboxfilt", "edgeMap", "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent",
+           "shift", "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip",
            "simplifyBoundary", "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis",
            "shortAxis", "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor",
            "characteristicShape", "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM",

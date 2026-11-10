@@ -487,9 +487,18 @@ def withBoundary(grains, b, ib):
                  boundary=b, innerBoundary=ib, phaseMap=grains.phaseMap)
 
 
+def smallGrainVertices(grains, nMin=14):
+  """the vertices of every grain of fewer than nMin boundary segments, each of which carries shape"""
+  gid = np.asarray(grains.boundary.grainId, dtype=np.int64)
+  count = np.bincount(gid[gid > 0], minlength=int(gid.max(initial=0)) + 1)
+  small = count < nMin
+  small[0] = False
+  return np.unique(grains.boundary.F[small[gid].any(axis=1)])
+
+
 # both boundaries are coarsened before either may drop a vertex the other still uses
-def _coarsenGrains(verb, grains, *args, **kw):
-  p = sharedVertices(grains)
+def _coarsenGrains(verb, grains, *args, protect=None, **kw):
+  p = sharedVertices(grains) if protect is None else np.union1d(sharedVertices(grains), protect)
   return withBoundary(grains, verb(grains.boundary, *args, protect=p, keepGrains=grains.id, **kw),
                       verb(grains.innerBoundary, *args, protect=p, keepGrains=grains.id, **kw))
 
@@ -554,8 +563,9 @@ def _simplifyGrains(grains, epsilon=None, margin=0.0, measuredV=None):
 
   Douglas-Peucker chain by chain: a straight run collapses into one segment while a corner
   stays. The junctions stay where they are and the polygons are traced again, so the grain
-  areas move by at most about epsilon times the perimeter. A grain too small for the
-  tolerance is left as it is rather than collapsed.
+  areas move by at most about epsilon times the perimeter. A grain of fewer than 14 boundary
+  vertices keeps every one of them, and a grain too small for the tolerance is left as it is
+  rather than collapsed.
 
   Input
     grains - grain2d
@@ -569,7 +579,7 @@ def _simplifyGrains(grains, epsilon=None, margin=0.0, measuredV=None):
     measuredV - the vertices the pixel edges were measured at, by default the boundary's
   See also
     grainBoundary.simplify, grain2d.reduceBoundary, grain2d.refineBoundary, smoothBoundary"""
-  return _coarsenGrains(simplifyBoundary, grains, epsilon, margin=margin, measuredV=measuredV)
+  return _coarsenGrains(simplifyBoundary, grains, epsilon, protect=smallGrainVertices(grains), margin=margin, measuredV=measuredV)
 
 
 # on a boundary the word says nothing: gB.reduce, gB.simplify, gB.refine
@@ -579,5 +589,6 @@ install(grain2d, _reduceGrains, "reduceBoundary")
 install(grain2d, _simplifyGrains, "simplifyBoundary")
 install(grain2d, _refineGrains, "refineBoundary")
 install(grain2d, sharedVertices)
+install(grain2d, smallGrainVertices)
 
 __all__ = ["mustKeep", "mergeRuns", "sharedVertices"]

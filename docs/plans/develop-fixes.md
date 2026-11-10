@@ -177,3 +177,17 @@ numbers. Not fixed; each waits for a decision.
   inside the other grain of a tie stays at 0 (forsterite: 597 pixels, 199 of the first 200 checked to
   lie in one of MATLAB's own grain polygons). The port tests the grains of all tied nearest sites and
   takes a corner on a boundary as outside.
+
+## Found by the port of the quadruple points and the area restoration (2026-11-10), open
+
+- `smoothBoundary` holds the junctions of the outer boundary and the corners of the map's convex
+  hull, as its help says, so that the map keeps its extent; the area restoration added in f4f570c05
+  then moves every plain vertex of the map rim, which `convhull` does not return, by up to 0.02
+  pixel in and out (the synthetic map of `bench/smoothing_ops.py`: 570 rim vertices free, the
+  largest move 0.0176 at (97.5, -0.5)), and the simplification afterwards keeps a vertex or two
+  differently. The port fixes every vertex on the hull's boundary, the ones along its edges
+  included, in the filter and in the restoration alike.
+- Outside its own class methods, `[grains.poly{:}]` yields the first grain's polygon alone, since
+  `grain2d/subsref` returns one output for the brace expansion; a script has to copy `grains.poly`
+  into a cell first. Harmless inside `smoothBoundary.m`, a trap for anyone reading its code into a
+  script.

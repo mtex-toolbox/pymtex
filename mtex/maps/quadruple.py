@@ -1,24 +1,29 @@
 # quadruple points: the four way contacts a square grid invents (Julia quadruple.jl)
 #
-#   quadruplePoints(c, seg)                 the vertices where four boundary faces meet
-#   splitQuadruplePoints(c, seg, ebsd, crit)   each split into two triple points, the map segmented again
+#   quadruplePoints(c, seg)                    the vertices where four boundary faces meet
+#   splitQuadruplePoints(c, seg, ebsd, crit)   each split into two triple points, the grains merged across
 #
 # On a square lattice four cells meet at every interior vertex, so a checkerboard of two
-# labels puts four boundary segments on one point. Which diagonal is connected is not in
-# the data, so removing a quadruple point means deciding it: the vertex is split into two
-# triple points, one diagonal pair of cells becomes adjacent, and the criterion judges
-# that pair like any other. The pairing is chosen by the measurements alone: the
-# criterion first, then the smaller misorientation angle, then where the two pixels lie.
-# The new adjacency is a face like any other and the segmentation runs once more over it.
-# The two vertices are pulled apart by sqrt(eps) of the shortest segment meeting them, so
-# the added segment has a direction.
+# labels puts four boundary segments on one point; in the filled cells, where the Voronoi
+# cells of one grain meet at the same point, further faces of that grain may end there.
+# Which diagonal is connected is not in the data, so removing a quadruple point means
+# deciding it: the vertex is split into two triple points, one diagonal pair of cells
+# becomes adjacent, and the criterion judges that pair like any other. A pairing is
+# possible where each of the two wedges it joins holds one measured cell. The pairing is
+# chosen by the measurements alone: first the diagonal the criterion connects whose pixels
+# lie in two grains, so that joining it merges them, then the criterion, then the smaller
+# misorientation angle, then where the two pixels lie. A point whose chosen diagonal fails
+# the criterion stays a quadruple point, so every split joins its pair and no added face is
+# a boundary. The two vertices move an eighth of a pixel apart, each into the wedge between
+# its two boundary edges, so the joined cells meet along a neck of a quarter pixel and the
+# added face has a direction.
 from __future__ import annotations
 
 import numpy as np
 
 from .criteria import connectivity, _misorientationAngle
 from .decomposition import cellComplex
-from .segment import segmentFrom
+from .segment import mergeAcross
 
 
 # the one site both of two faces bound, the cell in the wedge between them, or -1, for faces of
@@ -29,23 +34,35 @@ def _commonSite(a, b):
 
 
 def quadruplePoints(c, seg):
-  """the vertices where four faces meet, all four of them a grain boundary, with their faces
-  in counterclockwise order"""
+  """the vertices where exactly four grain boundary faces meet, whatever other faces end there,
+  with those four faces in counterclockwise order"""
   nV = len(c.V)
-  deg = np.bincount(c.F.reshape(-1), minlength=nV)
-  degOuter = np.bincount(c.F[seg.isOuter].reshape(-1), minlength=nV)
-  verts = np.flatnonzero((deg == 4) & (degOuter == 4)).astype(np.int32)
-  slot = np.full(nV, -1, dtype=np.int64)
-  slot[verts] = np.arange(len(verts))
-  # the four faces of every vertex, those it begins before those it ends, each in face order
-  r = slot[c.F.T].reshape(-1)
-  at = np.flatnonzero(r >= 0)
-  faces = np.tile(np.arange(len(c.F), dtype=np.int32), 2)[at[np.argsort(r[at], kind="stable")]].reshape(-1, 4)
-  # turned counterclockwise about the vertex
-  v = verts[:, None]
-  far = np.where(c.F[faces, 0] == v, c.F[faces, 1], c.F[faces, 0])
-  d = c.V[far] - c.V[v]
-  return verts, np.take_along_axis(faces, np.argsort(np.arctan2(d[..., 1], d[..., 0]), axis=1, kind="stable"), axis=1)
+  outer = np.flatnonzero(seg.isOuter).astype(np.int32)
+  degOuter = np.bincount(c.F[outer].reshape(-1), minlength=nV)
+  verts = np.flatnonzero(degOuter == 4).astype(np.int32)
+  return verts, _incidentFaces(c, verts, outer)[0].reshape(-1, 4)
+
+
+# the faces at every vertex of verts, among the candidates or all of them: the face, the direction
+# of its other end from the vertex, which vertex it belongs to and at which end; a vertex's faces
+# are consecutive, ordered counterclockwise
+def _incidentFaces(c, verts, candidates=None):
+  F = c.F if candidates is None else c.F[candidates]
+  slot = np.full(len(c.V), -1, dtype=np.int32)
+  slot[verts] = np.arange(len(verts), dtype=np.int32)
+  r = slot[F]
+  f, side = np.nonzero(r >= 0)
+  owner = r[f, side]
+  d = c.V[F[f, 1 - side]] - c.V[verts[owner]]
+  angle = np.arctan2(d[:, 1], d[:, 0])
+  order = np.lexsort((angle, owner))
+  faces = f if candidates is None else candidates[f]
+  return faces[order], angle[order], owner[order], side[order]
+
+
+# the other end of every face of the vertices verts, both of the same shape
+def _farVertex(c, verts, faces):
+  return np.where(c.F[faces, 0] == verts, c.F[faces, 1], c.F[faces, 0])
 
 
 # the misorientation angle of every pair, inf where none is defined, so such a pair never wins a tie
@@ -66,57 +83,82 @@ def _posKey(a, b):
   return np.where(first, b[:, 1], a[:, 1])
 
 
-def splitQuadruplePoints(c, seg, ebsd, crit):
-  """the cell complex with every quadruple point of a square grid split into two triple points and the
-  map segmented again: the diagonal pair of cells joined is the one the criterion connects more,
-  then the one of smaller misorientation, then by position"""
+# the keys that rank the pairing joining the sites a and b, larger first: whether the criterion
+# connects their pixels and they lie in two grains, the criterion, the smaller misorientation, the position
+def _rank(ebsd, crit, grainId, sites, a, b):
+  i, j = sites.pixel[a], sites.pixel[b]
+  c = connectivity(crit, ebsd, i, j)
+  return (c > 0) & (grainId[i] != grainId[j]), c, -_pairAngle(ebsd, i, j), -_posKey(sites.pos[a], sites.pos[b])
+
+
+# whether B beats A on the first key the two differ in
+def _beats(KB, KA):
+  win, tied = np.zeros(len(KA[0]), dtype=bool), np.ones(len(KA[0]), dtype=bool)
+  for a, b in zip(KA, KB):
+    win |= tied & (b > a)
+    tied &= a == b
+  return win
+
+
+# the unit bisector of two unit directions, zero where they are opposite
+def _bisector(u, v):
+  b = u + v
+  L = np.linalg.norm(b, axis=1)
+  return np.where(L[:, None] > 0, b / np.where(L > 0, L, 1)[:, None], 0.0)
+
+
+def splitQuadruplePoints(c, seg, ebsd, crit, backend=None):
+  """the cell complex with every quadruple point of a square grid split into two triple points a
+  quarter pixel apart and the grains merged across the diagonal pair joined: the pair that merges
+  two grains the criterion connects, else the one it connects more, then of smaller
+  misorientation, then by position; a point whose chosen pair the criterion separates stays"""
   verts, faces = quadruplePoints(c, seg)
+  if len(verts) == 0:
+    return c, seg
   sites = c.sites
-  # the cell in every wedge between two neighbouring faces: four distinct measured cells
+  # the one cell in every wedge between two neighbouring boundary faces, -1 where there are more
   cells = c.cells[faces]
   wedge = _commonSite(cells, np.roll(cells, -1, axis=1)).astype(np.int32)
-  s = np.sort(wedge, axis=1)
-  ok = np.all(wedge >= 0, axis=1) & np.all(s[:, 1:] != s[:, :-1], axis=1) & np.all(sites.pixel[wedge] >= 0, axis=1)
-  keep = np.flatnonzero(ok)
-  if len(keep) == 0:
-    return c, seg
-  verts, faces, wedge = verts[keep], faces[keep], wedge[keep]
-  n = len(verts)
-  pix = sites.pixel
+  single = (wedge >= 0) & (sites.pixel[np.maximum(wedge, 0)] >= 0)
   # the two candidate pairings: A joins the cells between faces 1,2 and 3,0 and detaches
   # faces 0,1 from the vertex; B joins those between 0,1 and 2,3
-  aL, aR = wedge[:, 1], wedge[:, 3]
-  bL, bR = wedge[:, 0], wedge[:, 2]
-  cA, cB = connectivity(crit, ebsd, pix[aL], pix[aR]), connectivity(crit, ebsd, pix[bL], pix[bR])
-  wA, wB = _pairAngle(ebsd, pix[aL], pix[aR]), _pairAngle(ebsd, pix[bL], pix[bR])
-  kA, kB = _posKey(sites.pos[aL], sites.pos[aR]), _posKey(sites.pos[bL], sites.pos[bR])
-  useB = (cB > cA) | ((cB == cA) & ((wB < wA) | ((wB == wA) & (kB < kA))))
-  T = c.V.dtype
-  V = np.concatenate([c.V, np.zeros((n, 2), dtype=T)])
-  F = c.F.copy()
+  okA = single[:, 1] & single[:, 3] & (wedge[:, 1] != wedge[:, 3])
+  okB = single[:, 0] & single[:, 2] & (wedge[:, 0] != wedge[:, 2])
+  w = np.maximum(wedge, 0)
+  KA = _rank(ebsd, crit, seg.grainId, sites, w[:, 1], w[:, 3])
+  KB = _rank(ebsd, crit, seg.grainId, sites, w[:, 0], w[:, 2])
+  useB = (okB & ~okA) | (okA & okB & _beats(KB, KA))
+  keep = np.flatnonzero((okA | okB) & (np.where(useB, KB[1], KA[1]) > 0))
+  if len(keep) == 0:
+    return c, seg
+  verts, faces, wedge, useB = verts[keep], faces[keep], wedge[keep], useB[keep]
+  n = len(verts)
   rows = np.arange(n)
-  # the first of the two faces that move, the cell between them and the one between the two that stay
+  # the first of the two boundary faces that move; the cells joined lie between m+1, m+2 and m+3, m
   m = np.where(useB, 3, 0)
-  wMove, wStay = wedge[rows, m], wedge[rows, (m + 2) % 4]
-  # the vertex and its copy pulled apart by sqrt(eps) of the shortest of its four segments
-  F4 = c.F[faces]
-  delta = np.sqrt(np.finfo(T).eps) * np.linalg.norm(c.V[F4[..., 1]] - c.V[F4[..., 0]], axis=2).min(axis=1)
+  at = lambda k: (m + k) % 4
+  # the vertex and its copy an eighth of a pixel apart, each along the bisector of its two faces
+  T = c.V.dtype
   p = c.V[verts]
-  dMove, dStay = sites.pos[wMove] - p, sites.pos[wStay] - p
+  d = c.V[_farVertex(c, verts[:, None], faces)] - p[:, None, :]
+  u = d / np.linalg.norm(d, axis=2)[..., None]
+  p = p.astype(float)
+  step = c.dxy / 8
+  V = np.concatenate([c.V, (p + step * _bisector(u[rows, at(0)], u[rows, at(1)])).astype(T)])
+  V[verts] = (p + step * _bisector(u[rows, at(2)], u[rows, at(3)])).astype(T)
   new = (len(c.V) + rows).astype(np.int32)
-  V[new] = p + (delta / 2)[:, None] * dMove / np.linalg.norm(dMove, axis=1)[:, None]
-  V[verts] = p + (delta / 2)[:, None] * dStay / np.linalg.norm(dStay, axis=1)[:, None]
-  # the two faces that move end at the copy instead
-  for f in (faces[rows, m], faces[rows, (m + 1) % 4]):
-    F[f, np.where(F[f, 0] == verts, 0, 1)] = new
+  # every face from the first moving face counterclockwise to the second ends at the copy instead
+  F = c.F.copy()
+  incident, angle, owner, side = _incidentFaces(c, verts)
+  a0, a1 = (np.arctan2(d[rows, at(k), 1], d[rows, at(k), 0]) for k in (0, 1))
+  move = np.mod(angle - a0[owner], 2 * np.pi) <= np.mod(a1[owner] - a0[owner], 2 * np.pi)
+  F[incident[move], side[move]] = new[owner[move]]
   newF = np.stack([verts, new], axis=1).astype(np.int32)
-  newCells = np.stack([wedge[rows, (m + 1) % 4], wedge[rows, (m + 3) % 4]], axis=1)
+  newCells = np.stack([wedge[rows, at(1)], wedge[rows, at(3)]], axis=1)
   c2 = cellComplex(V, np.concatenate([F, newF]), np.concatenate([c.cells, newCells]), sites, c.A, c.plane, c.shape,
-                   np.concatenate([c.V0, V[len(c.V):]]))
-  # the criterion has never seen the new pairs, and it alone decides whether the two
-  # cells a split joins are one grain
-  connect = np.concatenate([seg.connect, connectivity(crit, ebsd, pix[newCells[:, 0]], pix[newCells[:, 1]])])
-  return c2, segmentFrom(c2, ebsd, connect)
+                   np.concatenate([c.V0, c.V0[verts]]))
+  i, j = sites.pixel[newCells[:, 0]], sites.pixel[newCells[:, 1]]
+  return c2, mergeAcross(seg, c2, i, j, connectivity(crit, ebsd, i, j), backend)
 
 
 __all__ = []

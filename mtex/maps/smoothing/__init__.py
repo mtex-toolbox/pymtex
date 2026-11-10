@@ -19,9 +19,10 @@ import numpy as np
 
 from ...geometry.hull import convexHull
 from ...geometry.units import degree
-from ..boundaryresampling import _coarsenGrains, simplifyBoundary
+from ..boundaryresampling import _simplifyGrains
 from ..grains import grain2d
 from ..kernels import laplaceStepsNumba
+from ..polygon import _cyclicNext, _flatLoops
 from ...geometry.install import install
 from ...geometry.display import aligned
 
@@ -386,7 +387,36 @@ class pixelCells:
     return V
 
 
-# ------------------------------------------------------------------ the two steps
+# ------------------------------------------------------------------ the area
+
+def restoreArea(V, loops, A0, fixed, step, project=_keep, nSteps=5):
+  """the vertices V moved so that every outline encloses its area A0 again: each outline moves its
+  vertices along the gradient of its shoelace area by what the linearised area asks for, at most
+  step per coordinate, and they are held in their cells again, nSteps times; a fixed vertex stays"""
+  flat, _, lengths, owner, _ = _flatLoops(loops)
+  if not len(flat):
+    return V
+  owner = np.repeat(owner, lengths)
+  nxt = _cyclicNext(lengths)
+  prv = np.empty_like(nxt)
+  prv[nxt] = np.arange(len(nxt))
+  # the (outline, vertex) pairs, a vertex an outline passes twice counted once
+  key, pair = np.unique(owner * len(V) + flat, return_inverse=True)
+  g, v = key // len(V), key % len(V)
+  free = ~fixed[flat]
+  V = np.asarray(V, dtype=float)
+  for _ in range(nSteps):
+    t = (V[flat[nxt]] - V[flat[prv]]) / 2
+    gx = np.bincount(pair, np.where(free, t[:, 1], 0.0), len(key))
+    gy = np.bincount(pair, np.where(free, -t[:, 0], 0.0), len(key))
+    A = np.bincount(owner, V[flat, 0] * V[flat[nxt], 1] - V[flat[nxt], 0] * V[flat, 1], len(A0)) / 2
+    s = ((A0 - A) / np.maximum(np.bincount(g, gx * gx + gy * gy, len(A0)), np.finfo(float).eps))[g]
+    dV = np.stack([np.bincount(v, s * gx, len(V)), np.bincount(v, s * gy, len(V))], axis=1)
+    V = project(V + np.clip(dV, -step, step))
+  return V
+
+
+# ------------------------------------------------------------------ the three steps
 
 def smoothBoundary(grains, iter=20, simplify=None, moveOuterBoundary=False):
   """the grains with the pixel staircase of their boundaries turned into smooth curves; MATLAB's
@@ -400,7 +430,7 @@ def smoothBoundary(grains, iter=20, simplify=None, moveOuterBoundary=False):
     grains = smoothBoundary(grains, curvatureFilter(smoothingLength=3))  # a smoothing length
 
   calcGrains gives a boundary as a staircase of pixel edges, every segment along a grid axis.
-  The smoothing repairs it in two steps:
+  The smoothing repairs it in three steps:
 
   - the vertices are smoothed, by default by iter pairs of taubinFilter steps. After every
   step each vertex of a pixel edge is moved back into its cell, the square of the four pixel
@@ -408,9 +438,14 @@ def smoothBoundary(grains, iter=20, simplify=None, moveOuterBoundary=False):
   pixel spacing. So the boundary passes every pixel it was measured next to on the side it
   was measured on, and a triple point stays within half a step of where it was. A loose end
   stays put.
+  - every grain is given its measured area back: its vertices move along the gradient of the
+  area by what the linearised area asks for, five times at most a quarter pixel, each time held
+  in the cells again. A grain of a few pixels, which the filter shrinks to a fraction, ends
+  with the area it was measured with.
   - simplifyBoundary drops every vertex whose removal moves the boundary by less than a
   tolerance, d/10 by default, unless that would bring one of those pixel centres closer than
-  d/20 to the boundary or put it on the other side.
+  d/20 to the boundary or put it on the other side; a grain of fewer than 14 boundary vertices
+  keeps every one of them.
 
   The pixel edges are those with a nonzero gB.pixelDist, which calcGrains records. Grains built
   otherwise have none; then only the junctions are held within half a step. The outer boundary
@@ -472,14 +507,15 @@ def smoothBoundary(grains, iter=20, simplify=None, moveOuterBoundary=False):
   cells = pixelCells(V0[net.used], at[E], pd, np.flatnonzero((net.degree > 2) & ~net.fixed), d, d / 20)
   V = V0.copy()
   V[net.used] = F.smooth(V0[net.used], net, float(np.median(b.segLength)), cells.project)
+  V[net.used] = restoreArea(V[net.used], [[at[l] for l in ls] for ls in grains.loops], grains.area, net.fixed, d / 4, cells.project)
   V = V.astype(b.V.dtype, copy=False)
   grains = grain2d(grains.id, grains.phaseId, grains.CSList, grains.numPixel, grains.meanRotation, grains.GOS, grains.frame, grains.prop,
                    boundary=b._with(V=V), innerBoundary=ib._with(V=V), loops=grains.loops, phaseMap=grains.phaseMap)
   if simplify is False:
     return grains
-  return _coarsenGrains(simplifyBoundary, grains, d / 10 if simplify is None else simplify, margin=d / 20, measuredV=V0)
+  return _simplifyGrains(grains, d / 10 if simplify is None else simplify, margin=d / 20, measuredV=V0)
 
 
 install(grain2d, smoothBoundary)
 
-__all__ = ["boundaryFilter", "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells"]
+__all__ = ["boundaryFilter", "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells", "restoreArea"]

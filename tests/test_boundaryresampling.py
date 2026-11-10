@@ -4,7 +4,7 @@ import pytest
 
 from mtex import EBSD, phaseList, crystalFrame, rotation, zvector, degree, calcGrains, setMTEXpref, getMTEXpref, reduce
 from mtex import reduceBoundary, simplifyBoundary, refineBoundary
-from mtex.maps.boundaryresampling import keepShapeChains, sharedVertices, NO_PIXEL
+from mtex.maps.boundaryresampling import keepShapeChains, sharedVertices, smallGrainVertices, NO_PIXEL
 from mtex.maps.polygon import signedArea2
 from conftest import close
 from test_boundary import boundaryMap, boundaryOf, diskCircle, SQ4, CS
@@ -149,3 +149,14 @@ def test_a_closed_chain_with_fewer_than_three_kept_heads_keeps_its_thirds():
   for a, b in zip(s[gB.isClosed[s]], e[gB.isClosed[s]]):
     expected[a + np.unique(np.rint(np.linspace((b - a + 1) / 3, b - a + 1, 3)).astype(int)) - 1] = True
   assert expected.sum() >= 3 and np.array_equal(keep, expected)
+
+
+def test_a_grain_of_fewer_than_14_vertices_is_not_simplified():
+  # 2 x 2 blocks have 8 boundary vertices and keep them, 4 x 4 blocks have 16 and lose the collinear ones
+  for bs, kept in ((2, 8), (4, 4)):
+    e = boundaryMap(SQ4, 3, bs)
+    g = calcGrains(e, angle=5 * degree)
+    middle = e.grainId.reshape(-1)[(3 * bs // 2) * 3 * bs + 3 * bs // 2]
+    segments = lambda gr: np.count_nonzero((gr.boundary.grainId == middle).any(axis=1))
+    assert segments(g) == 4 * bs and segments(g.simplifyBoundary()) == kept
+    assert (len(smallGrainVertices(g)) > 0) == (bs == 2)
