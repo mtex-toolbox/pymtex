@@ -85,12 +85,12 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     delaunay - fill the gaps by the alpha complex of the indexed pixels, the Delaunay triangles
         of circumradius at most alpha, instead of the closing with a disk: exact where the
         closing is a raster approximation, and the choice for a large alpha (map of the plane)
-    alphaPore - the closing radius of the pores in place of alpha, see notIndexedKinds; inf by
+    alphaPore - the closing radius of the pores in place of alpha, see classifyNotIndexed; inf by
         default, so a pore is part of its grain
     alphaPocket - the closing radius of the pockets, alpha by default
     alphaCrack - the closing radius of the cracks, 0 by default, so a crack stays open where
         alpha would close it
-    kinds - the kind of every pixel, from notIndexedKinds, edited or not
+    kinds - the kind of every pixel, from classifyNotIndexed, edited or not
     straighten - draw the boundaries through the filled cells as straight lines (True), or
         along the bisectors between the measured pixels around them (map of the plane)
     removeQuadruplePoints - split every point where four pixels of a square grid meet into

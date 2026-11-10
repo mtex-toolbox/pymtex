@@ -63,11 +63,11 @@ hold(False)
 # ## The kinds of notIndexed regions
 #
 # `calcGrains` sorts the `notIndexed` regions into these kinds and treats every kind by a
-# rule of its own. The command [`notIndexedKinds`](EBSD.notIndexedKinds.html) returns the
-# kind of every pixel, so we can look at what `calcGrains` saw. We plot the kinds in colour
-# over the indexed pixels in light grey.
+# rule of its own. The command [`classifyNotIndexed`](EBSD.classifyNotIndexed.html) returns
+# the kind of every pixel, so we can look at what `calcGrains` saw. We plot the kinds in
+# colour over the indexed pixels in light grey.
 
-kinds, parts = notIndexedKinds(ebsd, angle=15 * degree)
+kinds, parts = classifyNotIndexed(ebsd, angle=15 * degree)
 
 names = ['pore', 'pocket', 'crack', 'void', 'speck']
 color = [[0.2, 0.4, 1], [1, 0.6, 0], [1, 0, 0], [0, 0, 0], [0.55, 0.55, 0.55]]

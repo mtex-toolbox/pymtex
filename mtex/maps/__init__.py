@@ -11,7 +11,7 @@ from .segment import *  # noqa: F401,F403
 from .boundary import grainBoundary, triplePointList, triplePoints, chainOrder
 from .quadruple import *  # noqa: F401,F403
 from .grains import grain2d
-from .calcgrains import calcGrains, notIndexedKinds
+from .calcgrains import calcGrains, classifyNotIndexed
 from .boundaryresampling import mustKeep, mergeRuns, sharedVertices
 from .smoothing import (boundaryFilter, laplaceFilter, taubinFilter, curvatureFilter, huberFilter, boundaryNetwork,
                         pixelCells, restoreArea)
@@ -36,7 +36,7 @@ from .funcs import (gridify, extent, shift, transform, findByLocation, findByOri
 __all__ = ["phaseList", "phaseColorNames", "colorTriplet", "lattice", "mapPlane", "latticeBasis", "EBSD", "EBSDsquare",
            "gridify", "decompose", "cellComplex", "grainBoundaryCriterion", "gbcAngle", "gbcSoft", "gbcEqual",
            "gbcCustom", "connectivity", "gbcFMC", "grainBoundary", "triplePointList", "triplePoints", "chainOrder",
-           "grain2d", "calcGrains", "notIndexedKinds", "mustKeep", "mergeRuns", "sharedVertices", "boundaryFilter",
+           "grain2d", "calcGrains", "classifyNotIndexed", "mustKeep", "mergeRuns", "sharedVertices", "boundaryFilter",
            "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells",
            "restoreArea", "shape2d", "polygonMoments", "calcTraces", "neighbourBall", "parentGrainReconstructor",
            "voteTable", "majorityVote", "mclComponents", "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList",

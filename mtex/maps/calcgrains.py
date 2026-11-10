@@ -6,7 +6,7 @@
 #   grains = calcGrains(ebsd, criterion=gbcSoft(10 * degree))
 #   grains = calcGrains(ebsd, fmc=3, minPixel=10, verbose=True)     fast multiscale clustering, gbcFMC
 #   grains = calcGrains(ebsd, alphaCrack=15)                        cracks up to 30 pixels wide bridged
-#   kinds, parts = notIndexedKinds(ebsd, alpha=3.1)                 the kind of every notIndexed pixel
+#   kinds, parts = classifyNotIndexed(ebsd, alpha=3.1)              the kind of every notIndexed pixel
 #
 # The map is written into: every measurement gets its grain id in ebsd.grainId, and the
 # cull marks the pixels of the grains it drops as not indexed, so the map that comes back
@@ -40,7 +40,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
   culls smaller grains, alpha bounds the decomposition (3.1, or 2.2 with delaunay, which fills
   the gaps by the alpha complex instead of the closing), alphaPore, alphaPocket and alphaCrack
-  close the notIndexed regions of that kind (notIndexedKinds) in place of alpha, by default inf,
+  close the notIndexed regions of that kind (classifyNotIndexed) in place of alpha, by default inf,
   alpha and 0, so a pore is part of its grain and a crack stays open; kinds hands the kind of
   every pixel back, edited or not; straighten draws the boundaries through
   the filled cells straight (False: along the bisectors between the pixels around them);
@@ -93,10 +93,10 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   return grains
 
 
-def notIndexedKinds(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=None, kinds=None, delaunay=False):
-  """the kinds of the notIndexed regions of a map, as calcGrains sees them; MATLAB's notIndexedKinds
+def classifyNotIndexed(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=None, kinds=None, delaunay=False):
+  """the kinds of the notIndexed regions of a map, as calcGrains sees them; MATLAB's classifyNotIndexed
 
-    kinds, parts = notIndexedKinds(ebsd, alpha=3.1)
+    kinds, parts = classifyNotIndexed(ebsd, alpha=3.1)
 
     # plot the cracks and reconstruct with a kind corrected by hand
     plot(ebsd[kinds == 'crack'])
@@ -403,4 +403,4 @@ def _grainTableNumpy(gid, ph, rot, n, numPixel, CSList):
   return phaseId, meanRot, gos
 
 
-__all__ = ["calcGrains", "notIndexedKinds"]
+__all__ = ["calcGrains", "classifyNotIndexed"]

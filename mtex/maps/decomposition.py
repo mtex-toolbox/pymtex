@@ -656,7 +656,7 @@ def decompose(ebsd, alpha=None, tol=None, backend=None, alphaPore=np.inf, alphaP
   2 alpha pixel spacings is filled, the cells of its indexed neighbours growing into it. A
   wider one keeps its pixels as holes, which calcGrains makes a notIndexed grain, unless a filled
   path of at most 2 alpha steps joins it to the outside, of which it is then a part. The wider
-  regions are pores, pockets, cracks or voids (notIndexedKinds), and each kind closes with a
+  regions are pores, pockets, cracks or voids (classifyNotIndexed), and each kind closes with a
   radius of its own in place of alpha: by default a pore is filled whole and a crack left open.
 
   The vertices that the cells of neighbouring pixels compute each for themselves are welded
@@ -678,7 +678,7 @@ def decompose(ebsd, alpha=None, tol=None, backend=None, alphaPore=np.inf, alphaP
         them whole
     alphaPocket - the closing radius of the pockets, alpha by default
     alphaCrack - the closing radius of the cracks, 0 by default, which leaves them open
-    kinds - the kind of every pixel, from notIndexedKinds, edited or not
+    kinds - the kind of every pixel, from classifyNotIndexed, edited or not
     criterion - the grainBoundaryCriterion the kinds are read with, by default the angle
         criterion with its default angle
     tol - the distance within which two vertices are welded into one, by default a
@@ -686,7 +686,7 @@ def decompose(ebsd, alpha=None, tol=None, backend=None, alphaPore=np.inf, alphaP
     backend - 'numba' or 'numpy', the loops of the clipping and the welding; by default the
         preference 'kernels'
   See also
-    calcGrains, notIndexedKinds, EBSD.gridify, GrainReconstruction"""
+    calcGrains, classifyNotIndexed, EBSD.gridify, GrainReconstruction"""
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it cannot be decomposed")

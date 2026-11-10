@@ -22,7 +22,7 @@ for k = 1:2*numel(names)
   T(k,:) = {allOps{k}, @() calcGrains(maps.(fieldName(src{i})), args{i}{:}, 'straighten', k <= numel(names)), @rows};
 end
 % the kind of every pixel of peridotite at 15 degree
-T(end,:) = {'peridotite_kinds', @() notIndexedKinds(maps.peridotite, 'angle', 15*degree), @(k) kindRows(k, maps.peridotite)};
+T(end,:) = {'peridotite_kinds', @() classifyNotIndexed(maps.peridotite, 'angle', 15*degree), @(k) kindRows(k, maps.peridotite)};
 algos = [repmat({'boundary straightening'}, 1, numel(names)), repmat({'grain segmentation'}, 1, numel(names)), {'notIndexed kinds'}];
 crosscheckRun(out, T, ops, containers.Map(allOps, algos), K, {}, containers.Map(allOps, num2cell(3*ones(1, numel(allOps)))));
 

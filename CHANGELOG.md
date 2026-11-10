@@ -25,7 +25,7 @@ the cells of their kind. By default a pore, a region enclosed by one grain, is f
 becomes part of that grain, a crack stays open where `alpha` would have bridged it, and a
 pocket between several grains closes with `alpha` as before, so `calcGrains(ebsd, alphaCrack=15)`
 bridges the cracks up to 30 pixels wide and `alphaPore=0` keeps the pores as notIndexed grains.
-`notIndexedKinds(ebsd)` returns the kind of every pixel and a table of the regions, and
+`classifyNotIndexed(ebsd)` returns the kind of every pixel and a table of the regions, and
 `calcGrains(ebsd, kinds=kinds)` takes the classification back, edited or not. The reach of the
 cells across a filled region is measured after the closing, so a crack bridged whole tiles, and
 a grain whose boundary does not close is named in an error. `calcGrains(ebsd, delaunay=True)`

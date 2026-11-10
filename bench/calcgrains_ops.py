@@ -57,7 +57,7 @@ ALGORITHM = [
    # in one port and moved in the other (forsterite: one chain of five segments, peridotite none)
    "tolerance": {op: None for op in OPS}},
   {"name": "notIndexed kinds",
-   "entry": {"matlab": ["@EBSD.notIndexedKinds", "kindOfParts"], "python": ["mtex.maps.calcgrains.notIndexedKinds", "mtex.maps.kinds.kindOfParts"]},
+   "entry": {"matlab": ["@EBSD.classifyNotIndexed", "kindOfParts"], "python": ["mtex.maps.calcgrains.classifyNotIndexed", "mtex.maps.kinds.kindOfParts"]},
    "cases": {KINDS_OP: "the kind of every pixel of peridotite at 15 degree: pore, pocket, crack, void, speck or indexed"},
    # the same kind on every pixel
    "tolerance": 0},
@@ -107,7 +107,7 @@ def kindRows(out):
 
 
 def run(ops):
-  from mtex import calcGrains, notIndexedKinds, degree
+  from mtex import calcGrains, classifyNotIndexed, degree
   maps = {m: load(m) for m in {source(op) for op in ops}}
 
   def call(op):
@@ -116,7 +116,7 @@ def run(ops):
     return lambda: calcGrains(maps[name].copy(), straighten=not op.endswith("_bisectors"), **kw)
 
   table = {op: (call(op), result) for op in OPS if op != KINDS_OP}
-  table[KINDS_OP] = (lambda: (notIndexedKinds(maps["peridotite"], angle=15 * degree)[0], maps["peridotite"]), kindRows)
+  table[KINDS_OP] = (lambda: (classifyNotIndexed(maps["peridotite"], angle=15 * degree)[0], maps["peridotite"]), kindRows)
   crosscheck.run(OUT, ALGORITHM, table, ops, reps=3)
 
 
