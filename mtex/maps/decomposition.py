@@ -18,7 +18,9 @@ import warnings
 
 import numpy as np
 
+from .criteria import connectivity, gbcAngle
 from .kernels import geoDistNumba, localVoronoiNumba, pixelKernel, weldNumba
+from .kinds import kindCodes, kindOfParts, labelCells
 from .lattice import STENCIL, cellCorners
 from .polygon import clipHalfPlane, seedBox, voronoiCell
 from ..geometry.display import aligned
@@ -34,10 +36,11 @@ def _gather(values, ind, fill):
 
 class siteSet:
   """the sites of the decomposition: their positions, lattice indices, measurements, which are
-  holes, the lookup from lattice cell to site and its offset, and the test of the filled cells"""
+  holes, the lookup from lattice cell to site and its offset, the test of the filled cells and the
+  reach of a cell in lattice steps, the half width of the widest filled region"""
 
-  def __init__(self, pos, ij, pixel, isHole, lookup, offset, fill=None):
-    self.pos, self.ij, self.pixel, self.isHole, self.lookup, self.offset, self.fill = pos, ij, pixel, isHole, lookup, offset, fill
+  def __init__(self, pos, ij, pixel, isHole, lookup, offset, fill=None, reach=0):
+    self.pos, self.ij, self.pixel, self.isHole, self.lookup, self.offset, self.fill, self.reach = pos, ij, pixel, isHole, lookup, offset, fill, reach
 
   def __len__(self):
     return len(self.pixel)
@@ -226,19 +229,20 @@ def closedAt(x, present, outside, offs):
   return pr[x] | dil[x[:, None] + o].all(axis=1) & ~out[x]
 
 
-def openCorridors(closed, ext, present, outside, A, alpha, stencil):
+def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None):
   """a hole joined to the outside by a filled path of at most 2 ceil(alpha) steps stays joined,
   through what the largest smaller closing that keeps it joined leaves open, so that a larger
   alpha keeps every grain a smaller one joins; repeated while the outside grows, as a hole that
-  joined it can bring the next one within reach"""
+  joined it can bring the next one within reach; the cells a kind's radius closed, byKind, stay"""
   n = 2 * int(np.ceil(alpha))
   dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
   radii = [alpha - 1 - k for k in range(int(np.floor(alpha - 2 + 1e-10)) + 1)] + [0]
   so = stencil[:, 0] * closed.shape[1] + stencil[:, 1]
   closed, prev = closed.copy(), None
+  byKind = np.zeros_like(closed) if byKind is None else byKind
   while prev is None or not np.array_equal(ext, prev):
     prev = ext
-    f = closed & ~present
+    f = closed & ~present & ~byKind
     dHole, hole = geoDist(~closed & ~ext, f, stencil, n)
     corridor = np.flatnonzero(f & (geoDist(ext, f, stencil, n)[0] + dHole <= n))
     for r in radii:
@@ -262,13 +266,7 @@ def recesses(material, A, r, stencil):
 
 def floodBorder(bg, stencil):
   """the background cells connected to the border of the raster"""
-  from scipy import ndimage
-  bg = np.asarray(bg, dtype=bool)
-  structure = np.zeros((3, 3), dtype=bool)
-  structure[1, 1] = True
-  for di, dj in stencil:
-    structure[1 + di, 1 + dj] = True
-  labels, n = ndimage.label(bg, structure=structure)
+  labels, n = labelCells(np.asarray(bg, dtype=bool), stencil)
   border = np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]])
   ext = np.unique(border[border > 0])
   return np.isin(labels, ext)
@@ -276,29 +274,29 @@ def floodBorder(bg, stencil):
 
 # ------------------------------------------------------------------ the sites
 
-def buildSites(l, P, present, alpha=3.1, measured=None):
-  """classify every lattice cell and place the sites; a cell of the padding of a grid is not
-  measured and lies outside the map as a cell beyond the lattice does"""
+def closeLattice(l, present, alpha=3.1, measured=None, rMax=None):
+  """the closing of the indexed cells on the padded raster of the lattice cells, with the indexed
+  cells, the cells outside the convex hull of the indexed cells, the pixel of every cell and the
+  lattice index of the raster's first cell; the padding leaves room for a closing by rMax. A cell
+  of the padding of a grid is not measured and lies outside the map as a cell beyond the lattice
+  does"""
   ij = l.ij
   n = len(ij)
-  r = alpha * l.dxy
   st = STENCIL[l.shape]
-  pad = int(np.ceil(2 * alpha)) + 4
+  pad = int(np.ceil(2 * (alpha if rMax is None else rMax))) + 4
   lo = (int(ij[:, 0].min()) - pad, int(ij[:, 1].min()) - pad)
   dims = (int(ij[:, 0].max()) - lo[0] + pad + 1, int(ij[:, 1].max()) - lo[1] + pad + 1)
   a, b = ij[:, 0] - lo[0], ij[:, 1] - lo[1]
   m = np.ones(n, dtype=bool) if measured is None else measured
-  hasPixel = np.zeros(dims, dtype=bool)
   isPresent = np.zeros(dims, dtype=bool)
   pixelOf = np.full(dims, NO_PIXEL, dtype=np.int32)
-  hasPixel[a[m], b[m]] = True
   pixelOf[a[m], b[m]] = np.arange(n, dtype=np.int32)[m]
   isPresent[a[present], b[present]] = True
   # the edge of the map is not the edge of a hole: beyond the convex hull of the indexed cells
   # the material counts as present while the closing erodes, so a gap along the edge closes
   # as one further in would
   outside = ~hullCells(isPresent)
-  closed = alphaClose(isPresent, l.A, r, st, outside)
+  closed = alphaClose(isPresent, l.A, alpha * l.dxy, st, outside)
   # a cell with material on more than half of its stencil is a one cell recess, which the
   # alpha shape fills; filling the mouth of a slit exposes the next cell
   while alpha >= 1:
@@ -306,9 +304,39 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
     if not add.any():
       break
     closed |= add
-  closed, ext = openCorridors(closed, floodBorder(~closed, st), isPresent, outside, l.A, alpha, st)
+  return closed, isPresent, outside, pixelOf, lo
+
+
+def buildSites(l, P, present, alpha=3.1, measured=None, radii=None, connects=None, kinds=None):
+  """classify every lattice cell and place the sites; radii are the closing radii of the pores,
+  the pockets and the cracks the closing with alpha leaves open, each replacing alpha on the cells
+  of its kind, decided with the criterion connects(i, j) on pairs of pixels and the kind codes
+  given per pixel; None closes with alpha alone"""
+  ij = l.ij
+  r = alpha * l.dxy
+  st = STENCIL[l.shape]
+  radii = (alpha,) * 3 if radii is None else tuple(radii)
+  closed, isPresent, outside, pixelOf, lo = closeLattice(l, present, alpha, measured, max(a for a in (alpha, *radii) if np.isfinite(a)))
+  dims = closed.shape
+  hasPixel = pixelOf >= 0
+  # a kind's radius replaces alpha on the cells of its kind: below alpha it reopens what the
+  # closing filled, 0 leaves the kind open, inf fills it whole; what it closes stays closed
+  byKind = np.zeros(dims, dtype=bool)
+  if any(a != alpha for a in radii):
+    kindP = kindOfParts(closed, isPresent, outside, pixelOf, connects, kinds, st, l.A)[0].reshape(-1)
+    for k, a in enumerate(radii, 1):
+      x = np.flatnonzero(kindP == k) if a != alpha else np.zeros(0, dtype=np.int64)
+      c = np.ones(len(x), dtype=bool) if np.isinf(a) else closedAt(x, isPresent, outside, diskOffsets(l.A, a * l.dxy, st))
+      byKind.reshape(-1)[x[c]] = True
+      closed.reshape(-1)[x] = c
+  closed, ext = openCorridors(closed, floodBorder(~closed, st), isPresent, outside, l.A, alpha, st, byKind)
   material = ~ext
   filled = closed & ~isPresent                 # the neighbours grow into these
+  # a cell reaches as far as the widest filled region: the closing bounds that by alpha, a kind's
+  # radius does not, so it is measured
+  m, reach = ~filled, 0
+  while not m[filled].all():
+    m, reach = dilate(m, st), reach + 1
   # the band, one ring outside, closes the map's cells; a band cell touching only filled cells,
   # or in a recess too wide for the closing, makes way for one further out, so that the outer
   # boundary runs straight across the filled cells
@@ -341,7 +369,7 @@ def buildSites(l, P, present, alpha=3.1, measured=None):
   # a site on the map without an indexed pixel is a hole, part of a notIndexed grain
   isHole = onMap & ~isPresent.reshape(-1)[flat]
   fill = fillDistance(filled, lo, P[present], ij[present], l.origin, l.A, st, cellPos) if filled.any() else None
-  return siteSet(pos, sij, pixel, isHole, lookup, lo, fill)
+  return siteSet(pos, sij, pixel, isHole, lookup, lo, fill, reach)
 
 
 class fillDistance:
@@ -548,7 +576,8 @@ def _gridKey(u):
   return key[:, 0] * (key[:, 1].max(initial=0) - key[:, 1].min(initial=0) + 1) + key[:, 1]
 
 
-def decompose(ebsd, alpha=3.1, tol=None, backend=None):
+def decompose(ebsd, alpha=3.1, tol=None, backend=None, alphaPore=np.inf, alphaPocket=None, alphaCrack=0, kinds=None,
+              criterion=None):
   """the spatial decomposition of a map into one cell around every pixel, the cell complex
   calcGrains builds the grains from; MATLAB's spatialDecomposition
 
@@ -562,7 +591,9 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None):
   alpha decides what happens to regions of not indexed pixels. A region narrower than
   2 alpha pixel spacings is filled, the cells of its indexed neighbours growing into it. A
   wider one keeps its pixels as holes, which calcGrains makes a notIndexed grain, unless a filled
-  path of at most 2 alpha steps joins it to the outside, of which it is then a part.
+  path of at most 2 alpha steps joins it to the outside, of which it is then a part. The wider
+  regions are pores, pockets, cracks or voids (notIndexedKinds), and each kind closes with a
+  radius of its own in place of alpha: by default a pore is filled whole and a crack left open.
 
   The vertices that the cells of neighbouring pixels compute each for themselves are welded
   into one when they lie within tol.
@@ -575,19 +606,33 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None):
   Keywords
     alpha - the closing radius in pixel spacings: a not indexed region narrower than 2 alpha
         is filled and its neighbours grow in, a wider one is kept
+    alphaPore - the closing radius of the pores in place of alpha, inf by default, which fills
+        them whole
+    alphaPocket - the closing radius of the pockets, alpha by default
+    alphaCrack - the closing radius of the cracks, 0 by default, which leaves them open
+    kinds - the kind of every pixel, from notIndexedKinds, edited or not
+    criterion - the grainBoundaryCriterion the kinds are read with, by default the angle
+        criterion with its default angle
     tol - the distance within which two vertices are welded into one, by default a
         hundredth of the pixel spacing
     backend - 'numba' or 'numpy', the loops of the clipping and the welding; by default the
         preference 'kernels'
   See also
-    calcGrains, EBSD.gridify, GrainReconstruction"""
+    calcGrains, notIndexedKinds, EBSD.gridify, GrainReconstruction"""
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it cannot be decomposed")
   P = l.plane.to2d(ebsd.pos.data.reshape(-1, 3))
   present = ebsd.isIndexed.reshape(-1)
-  sites = buildSites(l, P, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1))
-  cells, verts, unbounded = localVoronoi(sites, l.A, alpha, backend=backend)
+  crit = gbcAngle() if criterion is None else criterion
+
+  # the criterion on pairs of pixels
+  def connects(i, j):
+    return np.asarray(connectivity(crit, ebsd, i, j)) > 0
+
+  radii = (alphaPore, alpha if alphaPocket is None else alphaPocket, alphaCrack)
+  sites = buildSites(l, P, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1), radii, connects, kindCodes(kinds))
+  cells, verts, unbounded = localVoronoi(sites, l.A, max(alpha, sites.reach), backend=backend)
   if unbounded:
     warnings.warn(f"the decomposition left {unbounded} cells of the map open; its sites reach beyond the closing")
   V, F, cells = meshVertices(cells, verts, l.dxy / 100 if tol is None else tol, backend=backend)

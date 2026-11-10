@@ -323,10 +323,43 @@ def test_no_two_cells_touch_in_a_single_point_of_the_outer_boundary(alpha):
 
 def test_a_hole_of_absent_and_measured_pixels_is_one_notIndexed_grain():
   # MATLAB develop's remapIFD: the absent cells join a measured pixel of their hole, so the hole
-  # borders no void
+  # borders no void; the hole is a pore of the one grain, kept by closing the pores with alpha
   e = blockMap(SQ3, 1, 30, notIndexed=((15, 15, 6.0),))
   i = np.asarray(e.pos.data).reshape(-1, 3)[:, 0]
-  g = calcGrains(e[e.isIndexed | (i >= 15)], angle=5 * degree)
+  g = calcGrains(e[e.isIndexed | (i >= 15)], angle=5 * degree, alphaPore=3.1)
   hole = np.flatnonzero(~np.asarray(g.isIndexed))
   b = g.boundary
   assert len(hole) == 1 and not np.any((b.grainId == g.id[hole[0]]).any(axis=1) & (b.grainId == 0).any(axis=1))
+
+
+def test_each_kind_closes_with_its_own_radius():
+  # MATLAB's checkNotIndexedKinds: 16 grains, 4 of them cut in two by the crack, plus the pocket;
+  # the pore is filled by default and kept by a radius below alpha, a kind given by hand counts
+  from test_kinds import kindsMap
+  e, masks = kindsMap()
+  kinds = np.where(masks["crack"].reshape(-1), "pocket", np.where(masks["pore"].reshape(-1), "pore", "indexed"))
+  expected = [({}, 21), (dict(alphaPore=0), 22), (dict(alphaPocket=np.inf), 20), (dict(alphaCrack=np.inf), 17),
+              (dict(alphaPocket=np.inf, alphaCrack=np.inf), 16), (dict(alphaCrack=np.inf, kinds=kinds), 21)]
+  assert [len(calcGrains(e.copy(), threshold=5 * degree, **kw)) for kw, _ in expected] == [n for _, n in expected]
+
+
+def test_a_wide_crack_bridged_whole_leaves_no_notIndexed_grain():
+  # MATLAB's checkWideCrack: a crack far wider than 2 alpha on a 150 x 60 map, bridged with
+  # alphaCrack inf, so the cells reached across the fill: 30 grains of the 40 blocks, the middle
+  # block column being inside the crack, and away from the map edge, where the exterior takes a
+  # notch, the only pixels without a grain lie on the boundary down the middle of the crack
+  from test_kinds import blockMap
+  e, r, c = blockMap(150, 60, 15, lambda r, c: (c >= 23) & (c <= 47))
+  g = calcGrains(e, threshold=5 * degree, alphaCrack=np.inf)
+  r, c = r.reshape(-1), c.reshape(-1)
+  away = (r > 16) & (r < 135)
+  assert g.isIndexed.all() and len(g) == 30 and np.array_equal((e.grainId == 0) & away, (c == 35) & away)
+
+
+def test_a_grain_whose_boundary_does_not_close_is_named():
+  from types import SimpleNamespace
+  from mtex.maps.calcgrains import checkClosed
+  V = np.array([[0.0, 0], [1, 0], [1, 1], [0, 1]])
+  checkClosed(SimpleNamespace(V=V, F=np.array([[0, 1], [1, 2], [2, 3], [3, 0]]), grainId=np.array([[1, 0]] * 4)))
+  with pytest.raises(ValueError, match="grain 1"):
+    checkClosed(SimpleNamespace(V=V, F=np.array([[0, 1], [1, 2], [2, 3]]), grainId=np.array([[1, 0]] * 3)))

@@ -11,7 +11,7 @@ from .segment import *  # noqa: F401,F403
 from .boundary import grainBoundary, triplePointList, triplePoints, chainOrder
 from .quadruple import *  # noqa: F401,F403
 from .grains import grain2d
-from .calcgrains import calcGrains
+from .calcgrains import calcGrains, notIndexedKinds
 from .boundaryresampling import mustKeep, mergeRuns, sharedVertices
 from .smoothing import (boundaryFilter, laplaceFilter, taubinFilter, curvatureFilter, huberFilter, boundaryNetwork,
                         pixelCells)
@@ -36,17 +36,18 @@ from .funcs import (gridify, extent, shift, transform, findByLocation, findByOri
 __all__ = ["phaseList", "phaseColorNames", "colorTriplet", "lattice", "mapPlane", "latticeBasis", "EBSD", "EBSDsquare",
            "gridify", "decompose", "cellComplex", "grainBoundaryCriterion", "gbcAngle", "gbcSoft", "gbcEqual",
            "gbcCustom", "connectivity", "gbcFMC", "grainBoundary", "triplePointList", "triplePoints", "chainOrder",
-           "grain2d", "calcGrains", "mustKeep", "mergeRuns", "sharedVertices", "boundaryFilter", "laplaceFilter",
-           "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells", "shape2d",
-           "polygonMoments", "calcTraces", "neighbourBall", "parentGrainReconstructor", "voteTable", "majorityVote",
-           "mclComponents", "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList", "rescale", "imboxfilt",
-           "edgeMap", "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent", "shift", "transform",
-           "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip", "simplifyBoundary",
-           "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis", "shortAxis",
-           "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor", "characteristicShape",
-           "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM", "calcGROD", "grainMean",
-           "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth", "fill", "fillByGrainId",
-           "reduce", "subsample", "interp", "pos2ind", "pixelSizeMatch", "calcDistortion", "undistort", "setOptions"]
+           "grain2d", "calcGrains", "notIndexedKinds", "mustKeep", "mergeRuns", "sharedVertices", "boundaryFilter",
+           "laplaceFilter", "taubinFilter", "curvatureFilter", "huberFilter", "boundaryNetwork", "pixelCells",
+           "shape2d", "polygonMoments", "calcTraces", "neighbourBall", "parentGrainReconstructor", "voteTable",
+           "majorityVote", "mclComponents", "cleanUpPseudoSym", "simulateEBSD", "mapImage", "mapImageList", "rescale",
+           "imboxfilt", "edgeMap", "xcfShift", "pairShifts", "trueEbsd", "hex2cube", "cube2hex", "extent", "shift",
+           "transform", "findByLocation", "findByOrientation", "inpolygon", "reduceBoundary", "flip",
+           "simplifyBoundary", "refineBoundary", "smoothBoundary", "principalComponents", "fitEllipse", "longAxis",
+           "shortAxis", "aspectRatio", "paris", "shapeFactor", "convexity", "caliper", "paror", "surfor",
+           "characteristicShape", "hull", "gradient", "gradientX", "gradientY", "gradientZ", "curvature", "KAM",
+           "calcGROD", "grainMean", "spatialProfile", "calcMisorientation", "calcGND", "weightedBurgersVec", "smooth",
+           "fill", "fillByGrainId", "reduce", "subsample", "interp", "pos2ind", "pixelSizeMatch", "calcDistortion",
+           "undistort", "setOptions"]
 
 
 # The module path used by existing imports.

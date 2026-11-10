@@ -2,21 +2,27 @@
 function bench_calcgrains_ops(out, ops, K)
 
 maps = struct;
-names = {'small','peridotite_2.1','peridotite_6.1','peridotite_16.1','forsterite','forsterite_5','cracks'};
+names = {'small','peridotite_2.1','peridotite_6.1','peridotite_16.1','forsterite','forsterite_5','cracks', ...
+  'peridotite_15','peridotite_pocket10','peridotite_pocket10_crack15'};
 args = {{'angle',10*degree,'minPixel',5}, {'alpha',2.1,'minPixel',5}, {'alpha',6.1,'minPixel',5}, ...
-  {'alpha',16.1,'minPixel',5}, {}, {'minPixel',5}, {'angle',5*degree}};
-src = {'small','peridotite','peridotite','peridotite','forsterite','forsterite','T1_clean_cracks'};
+  {'alpha',16.1,'minPixel',5}, {}, {'minPixel',5}, {'angle',5*degree}, {'angle',15*degree,'minPixel',5}, ...
+  {'angle',15*degree,'minPixel',5,'alphaPocket',10}, {'angle',15*degree,'minPixel',5,'alphaPocket',10,'alphaCrack',15}};
+src = {'small','peridotite','peridotite','peridotite','forsterite','forsterite','T1_clean_cracks', ...
+  'peridotite','peridotite','peridotite'};
 ops = cellstr(ops);
 for k = 1:numel(names)
   if any(startsWith(ops, names{k})) && ~isfield(maps, fieldName(src{k})), maps.(fieldName(src{k})) = load(src{k}); end
 end
-allOps = [names, strcat(names, '_bisectors')];
+if any(strcmp(ops, 'peridotite_kinds')) && ~isfield(maps, 'peridotite'), maps.peridotite = load('peridotite'); end
+allOps = [names, strcat(names, '_bisectors'), {'peridotite_kinds'}];
 T = cell(numel(allOps), 3);
-for k = 1:numel(allOps)
+for k = 1:2*numel(names)
   i = mod(k-1, numel(names)) + 1;
   T(k,:) = {allOps{k}, @() calcGrains(maps.(fieldName(src{i})), args{i}{:}, 'straighten', k <= numel(names)), @rows};
 end
-algos = [repmat({'boundary straightening'}, 1, numel(names)), repmat({'grain segmentation'}, 1, numel(names))];
+% the kind of every pixel of peridotite at 15 degree
+T(end,:) = {'peridotite_kinds', @() notIndexedKinds(maps.peridotite, 'angle', 15*degree), @(k) kindRows(k, maps.peridotite)};
+algos = [repmat({'boundary straightening'}, 1, numel(names)), repmat({'grain segmentation'}, 1, numel(names)), {'notIndexed kinds'}];
 crosscheckRun(out, T, ops, containers.Map(allOps, algos), K, {}, containers.Map(allOps, num2cell(3*ones(1, numel(allOps)))));
 
 end
@@ -40,6 +46,12 @@ for gB = {g.boundary, g.innerBoundary}
   ok = all(gB{1}.grainId > 0, 2);
   R = [R; V(gB{1}.F(ok,1),:) V(gB{1}.F(ok,2),:)]; %#ok<AGROW>
 end
+end
+
+
+% the position of every pixel and the code of its kind, 1 pore to 6 indexed
+function R = kindRows(kinds, ebsd)
+R = [ebsd.x(:) ebsd.y(:) double(kinds(:)) zeros(numel(kinds), 1)];
 end
 
 

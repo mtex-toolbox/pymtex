@@ -26,8 +26,9 @@ from .grain3boundary import grain3Boundary
 from .grain3d import grain3d
 
 
-def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               mcl=None, fmc=None, verbose=False, backend=None, grainId=False, straighten=True):
+def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, alphaPore=np.inf, alphaPocket=None,
+               alphaCrack=0, kinds=None, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None, grainId=False,
+               straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps; MATLAB's
   grain reconstruction from 2d and 3d EBSD data
 
@@ -80,6 +81,12 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
         that would be smaller are marked notIndexed and the grains reconstructed again
     alpha - the bound of the decomposition in pixel spacings: a not indexed region
         narrower than 2 alpha is filled (map of the plane)
+    alphaPore - the closing radius of the pores in place of alpha, see notIndexedKinds; inf by
+        default, so a pore is part of its grain
+    alphaPocket - the closing radius of the pockets, alpha by default
+    alphaCrack - the closing radius of the cracks, 0 by default, so a crack stays open where
+        alpha would close it
+    kinds - the kind of every pixel, from notIndexedKinds, edited or not
     straighten - draw the boundaries through the filled cells as straight lines (True), or
         along the bisectors between the measured pixels around them (map of the plane)
     removeQuadruplePoints - split every point where four pixels of a square grid meet into
@@ -130,10 +137,11 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   if isinstance(angle, str) and angle == "grainId":
     angle, grainId = DEFAULT_ANGLE, True
   if not isinstance(ebsd, EBSD3):
-    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, removeQuadruplePoints, mcl, fmc, verbose, backend,
-                         grainId, straighten)
-  planar = {"alpha": alpha != 3.1, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints, "mcl": mcl is not None,
-            "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
+    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, alphaPore, alphaPocket, alphaCrack, kinds, removeQuadruplePoints,
+                         mcl, fmc, verbose, backend, grainId, straighten)
+  planar = {"alpha": alpha != 3.1, "alphaPore": alphaPore != np.inf, "alphaPocket": alphaPocket is not None, "alphaCrack": alphaCrack != 0,
+            "kinds": kinds is not None, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints,
+            "mcl": mcl is not None, "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
   if any(planar.values()):
     raise TypeError(f"calcGrains of a map of volumes takes no {', '.join(k for k, v in planar.items() if v)}")
   return _calcGrains3d(ebsd, angle, threshold, criterion, minPixel, grainId)

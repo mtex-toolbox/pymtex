@@ -17,6 +17,21 @@ alongside the Python implementation, and they caught defects of the port itself 
 the release, such as a 30 degree turn of hexagonal maps converted between `.ctf` and
 `.ang`.
 
+### Pores, pockets, cracks and voids
+
+`calcGrains` sorts the notIndexed regions wider than the closing into kinds and closes each
+kind with a radius of its own: `alphaPore`, `alphaPocket` and `alphaCrack` replace `alpha` on
+the cells of their kind. By default a pore, a region enclosed by one grain, is filled whole and
+becomes part of that grain, a crack stays open where `alpha` would have bridged it, and a
+pocket between several grains closes with `alpha` as before, so `calcGrains(ebsd, alphaCrack=15)`
+bridges the cracks up to 30 pixels wide and `alphaPore=0` keeps the pores as notIndexed grains.
+`notIndexedKinds(ebsd)` returns the kind of every pixel and a table of the regions, and
+`calcGrains(ebsd, kinds=kinds)` takes the classification back, edited or not. The reach of the
+cells across a filled region is measured after the closing, so a crack bridged whole tiles, and
+a grain whose boundary does not close is named in an error. The port follows MTEX 7.2's
+`calcGrains` and is checked against it on the peridotite map, grain by grain and pixel by
+pixel (`bench/calcgrains_ops.py`).
+
 ### Faster grain reconstruction
 
 Grain reconstruction runs substantially faster in our benchmarks against MATLAB,

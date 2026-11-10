@@ -5,6 +5,8 @@
 #   grains = calcGrains(ebsd, angle=[10 * degree, 2 * degree], minPixel=5, alpha=3.1)
 #   grains = calcGrains(ebsd, criterion=gbcSoft(10 * degree))
 #   grains = calcGrains(ebsd, fmc=3, minPixel=10, verbose=True)     fast multiscale clustering, gbcFMC
+#   grains = calcGrains(ebsd, alphaCrack=15)                        cracks up to 30 pixels wide bridged
+#   kinds, parts = notIndexedKinds(ebsd, alpha=3.1)                 the kind of every notIndexed pixel
 #
 # The map is written into: every measurement gets its grain id in ebsd.grainId, and the
 # cull marks the pixels of the grains it drops as not indexed, so the map that comes back
@@ -13,25 +15,33 @@
 # of what it joins (M3), and the grain table over the components.
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
-from .criteria import DEFAULT_ANGLE, gbcAngle, gbcEqual, grainBoundaryCriterion
-from .decomposition import decompose, splitPinches
+from .criteria import DEFAULT_ANGLE, connectivity, gbcAngle, gbcEqual, grainBoundaryCriterion
+from .decomposition import closeLattice, decompose, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
 from .kernels import absorbNumba, grainKernel
+from .kinds import INDEXED, KINDS, SPECK, VOID, kindCodes, kindOfParts
+from .lattice import STENCIL
 from .quadruple import splitQuadruplePoints
 from .segment import segment
 from .straighten import straightenInFill
 
 
-def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, removeQuadruplePoints=False,
-               mcl=None, fmc=None, verbose=False, backend=None, grainId=False, straighten=True):
+def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, alphaPore=np.inf, alphaPocket=None,
+               alphaCrack=0, kinds=None, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None, grainId=False,
+               straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
-  culls smaller grains, alpha bounds the decomposition, straighten draws the boundaries through
+  culls smaller grains, alpha bounds the decomposition, alphaPore, alphaPocket and alphaCrack
+  close the notIndexed regions of that kind (notIndexedKinds) in place of alpha, by default inf,
+  alpha and 0, so a pore is part of its grain and a crack stays open; kinds hands the kind of
+  every pixel back, edited or not; straighten draws the boundaries through
   the filled cells straight (False: along the bisectors between the pixels around them), mcl and
   fmc select Markov clustering and fast multiscale clustering, grainId=True joins the pixels of
   one grain id stored with the map, ebsd.prop['grainId']. The map keeps the grain ids"""
@@ -47,24 +57,26 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     criterion = gbcEqual(stored)
   if criterion is None and fmc is not None:
     criterion = gbcFMC(fmc, verbose=verbose)
-  crit = criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
+  crit = criterionOf(angle, threshold, criterion)
   # a criterion that absorbs the small regions itself takes minPixel instead of the cull
   if crit.handlesMinPixel:
     crit = crit.setMinPixel(minPixel) if minPixel > 1 else crit
     minPixel = 1
   releaseAbsorbed(ebsd)
-  c = decompose(ebsd, alpha, backend=backend)
+  decomposed = partial(decompose, ebsd, alpha, backend=backend, alphaPore=alphaPore, alphaPocket=alphaPocket, alphaCrack=alphaCrack,
+                       kinds=kinds, criterion=crit)
+  c = decomposed()
   # the cull changes the map the closing runs on, so it is a pass over the whole reconstruction;
   # the first sizes the grains before the pinches are split, as MATLAB's minPixelMask, and the
   # decomposition repeats until no grain re-fragments below minPixel
   if minPixel > 1 and markUndersized(ebsd, segment(c, ebsd, crit, backend, mcl), minPixel):
-    c = decompose(ebsd, alpha, backend=backend)
+    c = decomposed()
   while True:
     c = splitPinches(c)
     seg = segment(c, ebsd, crit, backend, mcl)
     if minPixel <= 1 or not markUndersized(ebsd, seg, minPixel):
       break
-    c = decompose(ebsd, alpha, backend=backend)
+    c = decomposed()
   if straighten:
     c, seg = straightenInFill(c, seg)
   # the diagonal ambiguity is decided on the map the grains are built from, so the split
@@ -72,9 +84,83 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   if removeQuadruplePoints:
     c, seg = splitQuadruplePoints(c, seg, ebsd, crit)
   grains = grainTable(seg, ebsd, buildBoundary(c, seg, ebsd), buildBoundary(c, seg, ebsd, inner=True))
+  checkClosed(grains.boundary)
   ebsd.grainId = absorbInteriorPixels(c, ebsd, seg.grainId, grains.boundary, backend=backend).reshape(ebsd.shape)
   absorbNotIndexed(ebsd, grains)
   return grains
+
+
+def notIndexedKinds(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=3.1, kinds=None):
+  """the kinds of the notIndexed regions of a map, as calcGrains sees them; MATLAB's notIndexedKinds
+
+    kinds, parts = notIndexedKinds(ebsd, alpha=3.1)
+
+    # plot the cracks and reconstruct with a kind corrected by hand
+    plot(ebsd[kinds == 'crack'])
+    kinds[(kinds == 'crack') & (ebsd.x < 1000)] = 'pocket'
+    grains = calcGrains(ebsd, alphaCrack=15, kinds=kinds)
+
+  The closing with alpha fills every notIndexed region narrower than about 2 alpha pixels. What
+  it leaves open are the thick parts, and each of them is a pore, a pocket, a crack or a void.
+  calcGrains closes a part with the radius of its kind, alphaPore, alphaPocket or alphaCrack. By
+  default it fills the pores whole and leaves the cracks entirely open.
+
+  The kinds are decided in this order: a part with Feret^2 / area >= 5 whose boundary runs along
+  grains for at least half of its length is a crack; one touching the edge of the scan is a void;
+  one whose rim is held to 85 percent by pixels the criterion connects is a pore; the rest are
+  pockets. What lies between two parts of a crack, joined to both by notIndexed pixels, is part
+  of the crack.
+
+  Input
+    ebsd - EBSD on a lattice
+  Output
+    kinds - the kind of every pixel, an array of the map's shape: 'pore', 'pocket', 'crack',
+        'void', 'speck' (a thin region, filled by alpha) or 'indexed'
+    parts - the thick parts as a dict of columns: id, kind, area in pixels, feret, the Feret
+        diameter, elong, Feret^2 / area, border, gap, the boundary cells against notIndexed cells,
+        rim, those against grains, and share, the rim share of the largest orientation
+  Keywords
+    alpha - the closing radius in pixels
+    angle - the misorientation angle of calcGrains, since the rim test uses its criterion
+    threshold - the same as angle, which it replaces when given
+    criterion - a grainBoundaryCriterion instead of the angle
+    kinds - a kind per pixel replacing the computed kind of every part it covers
+  See also
+    calcGrains, GrainReconstructionCracks"""
+  crit = criterionOf(angle, threshold, criterion)
+  l = ebsd.lattice
+  if l is None:
+    raise ValueError("the map is not on a lattice, so its notIndexed regions have no kinds")
+  # an indexed pixel without rotation is notIndexed, as in calcGrains
+  present = ebsd.isIndexed.reshape(-1) & ~np.isnan(ebsd.rotations.data.reshape(-1, 4)[:, 0])
+  closed, isPresent, outside, pixelOf, lo = closeLattice(l, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1))
+
+  # the criterion on pairs of pixels
+  def connects(i, j):
+    return np.asarray(connectivity(crit, ebsd, i, j)) > 0
+
+  k, parts = kindOfParts(closed, isPresent, outside, pixelOf, connects, kindCodes(kinds), STENCIL[l.shape], l.A)
+  k = np.where(isPresent, INDEXED, np.where(k > 0, k, np.where(outside, VOID, SPECK)))
+  return KINDS[k[l.ij[:, 0] - lo[0], l.ij[:, 1] - lo[1]] - 1].reshape(ebsd.shape), parts
+
+
+def criterionOf(angle, threshold, criterion):
+  """the criterion of the options of calcGrains: a grainBoundaryCriterion, given as such or in
+  place of the angle, or else the angle criterion with the angle or the threshold"""
+  if isinstance(angle, grainBoundaryCriterion):
+    return angle
+  return criterion if criterion is not None else gbcAngle(angle if threshold is None else threshold)
+
+
+def checkClosed(boundary):
+  """every grain's boundary closes: within a grain, every vertex is met by an even number of
+  segments; the first grain whose boundary does not is named in the error"""
+  G, F = np.asarray(boundary.grainId), np.asarray(boundary.F)
+  g, v = np.concatenate([G[:, 0], G[:, 1], G[:, 0], G[:, 1]]), np.concatenate([F[:, 0], F[:, 0], F[:, 1], F[:, 1]])
+  nV = len(boundary.V)
+  u, c = np.unique(v[g > 0] + (g[g > 0] - 1) * nV, return_counts=True)
+  if (c % 2).any():
+    raise ValueError(f"the boundary of grain {u[c % 2 == 1][0] // nV + 1} does not close")
 
 
 def absorbNotIndexed(ebsd, grains):
@@ -312,4 +398,4 @@ def _grainTableNumpy(gid, ph, rot, n, numPixel, CSList):
   return phaseId, meanRot, gos
 
 
-__all__ = ["calcGrains"]
+__all__ = ["calcGrains", "notIndexedKinds"]

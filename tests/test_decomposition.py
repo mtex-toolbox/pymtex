@@ -96,12 +96,13 @@ def test_D2_the_complex_is_a_partition(backend):
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_D3_the_closing_fills_what_is_narrower_than_2alpha(backend):
   # a hole narrower than twice the closing radius is filled and its cells lose their site,
-  # so the neighbours grow in; a wider one keeps a core of sites, which becomes a notIndexed grain
+  # so the neighbours grow in; a wider one keeps a core of sites, which becomes a notIndexed grain,
+  # unless it is a pore, which the default fills whole, so the pores close with alpha here
   # the Python form is the oracle and slow, so it runs on a smaller map
   n = 40 if backend == "numba" else 26
   for r, filled in ((1.5, True), (2.0, True), (9.0, False)):
     e = decompMap(SQ2, n, holes=((n // 2, n // 2, r),))
-    c = decompose(e, alpha=3.1, backend=backend)
+    c = decompose(e, alpha=3.1, alphaPore=3.1, backend=backend)
     hasSite = np.zeros(len(e), dtype=bool)
     hasSite[c.site2pixel[c.site2pixel >= 0]] = True
     ind = e.isIndexed
@@ -110,7 +111,7 @@ def test_D3_the_closing_fills_what_is_narrower_than_2alpha(backend):
     assert (kept == 0) == filled
   # a larger alpha fills more
   e = decompMap(SQ2, n, holes=((n // 2, n // 2, 4.0),))
-  assert decompose(e, alpha=1.0, backend=backend).nSites > decompose(e, alpha=6.0, backend=backend).nSites
+  assert decompose(e, alpha=1.0, alphaPore=1.0, backend=backend).nSites > decompose(e, alpha=6.0, alphaPore=6.0, backend=backend).nSites
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
