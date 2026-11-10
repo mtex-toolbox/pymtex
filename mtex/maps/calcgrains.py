@@ -22,7 +22,7 @@ import numpy as np
 from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
 from .criteria import DEFAULT_ANGLE, connectivity, gbcAngle, gbcEqual, grainBoundaryCriterion
-from .decomposition import closeLattice, decompose, splitPinches
+from .decomposition import closeLattice, decompose, defaultAlpha, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
 from .kernels import absorbNumba, grainKernel
@@ -33,12 +33,13 @@ from .segment import segment
 from .straighten import straightenInFill
 
 
-def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, alphaPore=np.inf, alphaPocket=None,
-               alphaCrack=0, kinds=None, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None, grainId=False,
-               straighten=True):
+def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=None, alphaPore=np.inf, alphaPocket=None,
+               alphaCrack=0, kinds=None, delaunay=False, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None,
+               grainId=False, straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps: a
   misorientation angle below angle (or threshold), or a grainBoundaryCriterion; minPixel
-  culls smaller grains, alpha bounds the decomposition, alphaPore, alphaPocket and alphaCrack
+  culls smaller grains, alpha bounds the decomposition (3.1, or 2.2 with delaunay, which fills
+  the gaps by the alpha complex instead of the closing), alphaPore, alphaPocket and alphaCrack
   close the notIndexed regions of that kind (notIndexedKinds) in place of alpha, by default inf,
   alpha and 0, so a pore is part of its grain and a crack stays open; kinds hands the kind of
   every pixel back, edited or not; straighten draws the boundaries through
@@ -64,7 +65,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
     minPixel = 1
   releaseAbsorbed(ebsd)
   decomposed = partial(decompose, ebsd, alpha, backend=backend, alphaPore=alphaPore, alphaPocket=alphaPocket, alphaCrack=alphaCrack,
-                       kinds=kinds, criterion=crit)
+                       kinds=kinds, criterion=crit, delaunay=delaunay)
   c = decomposed()
   # the cull changes the map the closing runs on, so it is a pass over the whole reconstruction;
   # the first sizes the grains before the pinches are split, as MATLAB's minPixelMask, and the
@@ -90,7 +91,7 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   return grains
 
 
-def notIndexedKinds(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=3.1, kinds=None):
+def notIndexedKinds(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=None, kinds=None, delaunay=False):
   """the kinds of the notIndexed regions of a map, as calcGrains sees them; MATLAB's notIndexedKinds
 
     kinds, parts = notIndexedKinds(ebsd, alpha=3.1)
@@ -120,7 +121,8 @@ def notIndexedKinds(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, a
         diameter, elong, Feret^2 / area, border, gap, the boundary cells against notIndexed cells,
         rim, those against grains, and share, the rim share of the largest orientation
   Keywords
-    alpha - the closing radius in pixels
+    alpha - the closing radius in pixels, 3.1 by default, or 2.2 with delaunay
+    delaunay - the gaps filled by the alpha complex instead of the closing, as calcGrains
     angle - the misorientation angle of calcGrains, since the rim test uses its criterion
     threshold - the same as angle, which it replaces when given
     criterion - a grainBoundaryCriterion instead of the angle
@@ -133,7 +135,8 @@ def notIndexedKinds(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, a
     raise ValueError("the map is not on a lattice, so its notIndexed regions have no kinds")
   # an indexed pixel without rotation is notIndexed, as in calcGrains
   present = ebsd.isIndexed.reshape(-1) & ~np.isnan(ebsd.rotations.data.reshape(-1, 4)[:, 0])
-  closed, isPresent, outside, pixelOf, lo = closeLattice(l, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1))
+  closed, isPresent, outside, pixelOf, lo = closeLattice(l, l.plane.to2d(ebsd.pos.data.reshape(-1, 3)), present, defaultAlpha(alpha, delaunay),
+                                                         None if ebsd._pad is None else ~ebsd._pad.reshape(-1), delaunay=delaunay)[:5]
 
   # the criterion on pairs of pixels
   def connects(i, j):

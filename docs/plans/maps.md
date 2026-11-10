@@ -58,7 +58,7 @@ section 9.
 | `ebsd.prop.mad`, `dynProp` | `ebsd.prop` dict, reachable as `ebsd.mad` | properties as a dict; options as keywords |
 | `ebsd(cond)`, `ebsd('Forsterite')`, `ebsd('indexed')`, `ebsd(i,j)` | `ebsd[mask]`, `ebsd['Forsterite']`, `ebsd['indexed']`, `ebsd[i, j]` on a gridded map | `EBSD` is a table: indexing returns a sub-map |
 | `spatialDecompositionGrid`, `jcvoronoi`, `spatialDecomposition` | `decompose(ebsd, alpha)` returning a cell complex | the local clipping of unit cells, the alpha closing as a distance transform, no Voronoi library |
-| `spatialDecompositionAlpha` (`'delaunay'`) | `decompose(..., method='alphaComplex')` | needs a general triangulation, `scipy.spatial.Delaunay` behind an option |
+| `spatialDecompositionAlpha` (`'delaunay'`) | `decompose(..., delaunay=True)`, `calcGrains(..., delaunay=True)`, alpha 2.2 by default | `alphaComplexRadius`: `scipy.spatial.Delaunay` of the indexed positions, the circumradius of the smallest triangle covering every unmeasured cell, read where the closing reads its raster |
 | `gbcAngle`, `gbcSoft`, `gbcVariants`, `gbcCustom`, `gbcFMC` | `gbcAngle`, `gbcSoft`, `gbcEqual`, `gbcCustom`, `gbcFMC` (`maps/fmc.py`, `calcGrains(..., fmc=)`, MATLAB's hierarchy pair for pair on the same pixel order) | one `connectivity(crit, ebsd, i, j)` per pair, levels as the threshold, `byPhase` |
 | `doSegmentation`, `connectedComponents`, `I_DG` | `segment(complex, ebsd, criterion)` | union-find with path halving |
 | `[grains, ebsd.grainId] = calcGrains(ebsd)` | `grains = calcGrains(ebsd)`, the grain id written into the map, `ebsd.copy()` to keep it | the two-pass cull of `minPixel` |

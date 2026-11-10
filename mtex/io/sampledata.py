@@ -504,9 +504,10 @@ def testGrainsMap():
   return EBSD(pos, rot, np.where(holes, 0, 1), [cs]).gridify()
 
 
+# the holes of the discs stay notIndexed grains, as the stored grains of MATLAB's testgrains.mat
 def _testGrains(files):
   from ..maps.calcgrains import calcGrains
-  return calcGrains(testGrainsMap(), 5 * degree)
+  return calcGrains(testGrainsMap(), 5 * degree, alphaPore=3.1)
 
 
 _dataset("aachen", "EBSD", "two-phase iron and magnesium map", "aachen", _aachen)
@@ -516,6 +517,7 @@ _dataset("csl", "EBSD", "iron map for the coincidence site lattice examples", "c
 _dataset("mylonite", "EBSD", "multiphase mylonite map", "mylonite", _mylonite)
 _dataset("epidote", "EBSD", "multiphase epidote map", "epidote", _epidote)
 _dataset("forsterite", "EBSD", "multiphase Forsterite map", "forsterite", _oxford)
+_dataset("peridotite", "EBSD", "peridotite thin section with a crack, pores and pockets", "peridotite", _oxford)
 _dataset("olivine", "EBSD", "olivine optical map in the prepared reference frame", "olivine", _olivine)
 _dataset("twins", "EBSD", "magnesium map for the twinning examples", "twins", _oxford)
 _dataset("copper", "EBSD", "copper map, EDAX setting 1", "copper", lambda p: loadEBSD(p, setting=1))

@@ -11,7 +11,8 @@
 # An op is <map>[_<alpha>][_bisectors]: small at 10 degree and minPixel 5, peridotite at alpha 2.1, 6.1
 # and 16.1 with minPixel 5, forsterite with minPixel 1 and 5, the T1 instance with cracks at 5 degree,
 # and peridotite at 15 degree and minPixel 5 with the pores filled and the crack open (the default), with
-# the pockets closed by alphaPocket 10, and with the crack bridged by alphaCrack 15 as well.
+# the pockets closed by alphaPocket 10, with the crack bridged by alphaCrack 15 as well, and with the gaps
+# filled by the alpha complex (delaunay=True).
 # The ports number grains their own way, so a result is the grain count, then every segment between
 # two grains, of both boundaries, as rows (x1, y1, x2, y2), matched by midpoint. The outer boundary is
 # left out: MATLAB's vertices at the map corners lie up to 1e-3 pixels off the lattice. peridotite_kinds
@@ -35,7 +36,8 @@ MAPS = {"small": ("small", dict(angle=10, minPixel=5)), "peridotite_2.1": ("peri
         "peridotite_6.1": ("peridotite", dict(alpha=6.1, minPixel=5)), "peridotite_16.1": ("peridotite", dict(alpha=16.1, minPixel=5)),
         "forsterite": ("forsterite", {}), "forsterite_5": ("forsterite", dict(minPixel=5)), "cracks": (CRACKS, dict(angle=5)),
         "peridotite_15": ("peridotite", dict(angle=15, minPixel=5)), "peridotite_pocket10": ("peridotite", dict(angle=15, minPixel=5, alphaPocket=10)),
-        "peridotite_pocket10_crack15": ("peridotite", dict(angle=15, minPixel=5, alphaPocket=10, alphaCrack=15))}
+        "peridotite_pocket10_crack15": ("peridotite", dict(angle=15, minPixel=5, alphaPocket=10, alphaCrack=15)),
+        "peridotite_delaunay": ("peridotite", dict(angle=15, minPixel=5, delaunay=True))}
 KINDS_OP = "peridotite_kinds"
 OPS = [m + s for m in MAPS for s in ("", "_bisectors")] + [KINDS_OP]
 STRAIGHT = "the straightened vertices: the cut points are bisections whose midpoint falls on a lattice edge, decided by 1e-14 of either port"

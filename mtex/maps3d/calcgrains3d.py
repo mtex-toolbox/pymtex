@@ -26,9 +26,9 @@ from .grain3boundary import grain3Boundary
 from .grain3d import grain3d
 
 
-def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=3.1, alphaPore=np.inf, alphaPocket=None,
-               alphaCrack=0, kinds=None, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None, grainId=False,
-               straighten=True):
+def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPixel=1, alpha=None, alphaPore=np.inf, alphaPocket=None,
+               alphaCrack=0, kinds=None, delaunay=False, removeQuadruplePoints=False, mcl=None, fmc=None, verbose=False, backend=None,
+               grainId=False, straighten=True):
   """the grains of a map, the pixels joined across every boundary the criterion keeps; MATLAB's
   grain reconstruction from 2d and 3d EBSD data
 
@@ -79,8 +79,12 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
         clustering
     minPixel - the smallest number of pixels of a grain; the pixels of an indexed grain
         that would be smaller are marked notIndexed and the grains reconstructed again
-    alpha - the bound of the decomposition in pixel spacings: a not indexed region
-        narrower than 2 alpha is filled (map of the plane)
+    alpha - the bound of the decomposition in pixel spacings, 3.1 by default: a not indexed
+        region narrower than 2 alpha is filled; with delaunay the circumradius bound of the
+        alpha complex, 2.2 by default (map of the plane)
+    delaunay - fill the gaps by the alpha complex of the indexed pixels, the Delaunay triangles
+        of circumradius at most alpha, instead of the closing with a disk: exact where the
+        closing is a raster approximation, and the choice for a large alpha (map of the plane)
     alphaPore - the closing radius of the pores in place of alpha, see notIndexedKinds; inf by
         default, so a pore is part of its grain
     alphaPocket - the closing radius of the pockets, alpha by default
@@ -137,10 +141,10 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   if isinstance(angle, str) and angle == "grainId":
     angle, grainId = DEFAULT_ANGLE, True
   if not isinstance(ebsd, EBSD3):
-    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, alphaPore, alphaPocket, alphaCrack, kinds, removeQuadruplePoints,
-                         mcl, fmc, verbose, backend, grainId, straighten)
-  planar = {"alpha": alpha != 3.1, "alphaPore": alphaPore != np.inf, "alphaPocket": alphaPocket is not None, "alphaCrack": alphaCrack != 0,
-            "kinds": kinds is not None, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints,
+    return _calcGrains2d(ebsd, angle, threshold, criterion, minPixel, alpha, alphaPore, alphaPocket, alphaCrack, kinds, delaunay,
+                         removeQuadruplePoints, mcl, fmc, verbose, backend, grainId, straighten)
+  planar = {"alpha": alpha is not None, "alphaPore": alphaPore != np.inf, "alphaPocket": alphaPocket is not None, "alphaCrack": alphaCrack != 0,
+            "kinds": kinds is not None, "delaunay": delaunay, "straighten": straighten is not True, "removeQuadruplePoints": removeQuadruplePoints,
             "mcl": mcl is not None, "fmc": fmc is not None, "verbose": verbose, "backend": backend is not None}
   if any(planar.values()):
     raise TypeError(f"calcGrains of a map of volumes takes no {', '.join(k for k, v in planar.items() if v)}")

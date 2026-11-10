@@ -363,3 +363,17 @@ def test_a_grain_whose_boundary_does_not_close_is_named():
   checkClosed(SimpleNamespace(V=V, F=np.array([[0, 1], [1, 2], [2, 3], [3, 0]]), grainId=np.array([[1, 0]] * 4)))
   with pytest.raises(ValueError, match="grain 1"):
     checkClosed(SimpleNamespace(V=V, F=np.array([[0, 1], [1, 2], [2, 3]]), grainId=np.array([[1, 0]] * 3)))
+
+
+def test_the_alpha_complex_gives_the_grains_of_a_block_map_on_both_lattices():
+  # MATLAB's delaunay cases of check_calcGrainsCases: a regular grid is cocircular everywhere
+  for A in (SQ3, HEX3):
+    g = calcGrains(blockMap(A, 4, 5), angle=5 * degree, delaunay=True)
+    assert len(g) == 16 and np.all(g.numPixel == 25)
+
+
+def test_each_kind_closes_with_its_own_circumradius_bound():
+  # the kinds table under the alpha complex, MATLAB's counts
+  from test_kinds import kindsMap
+  e = kindsMap()[0]
+  assert [len(calcGrains(e.copy(), threshold=5 * degree, delaunay=True, **kw)) for kw in ({}, dict(alphaPore=0), dict(alphaCrack=np.inf))] == [21, 22, 17]

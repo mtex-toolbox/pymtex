@@ -1,6 +1,7 @@
 # the spatial decomposition of a map: one cell per measurement (Julia decomposition.jl)
 #
 #   decompose(ebsd, alpha=3.1)    the closing, the sites and their cells, as a cellComplex
+#   decompose(ebsd, delaunay=True)   the alpha complex of the indexed pixels in place of the closing
 #   c.V, c.F, c.cells             the vertices, the vertex pair and the site pair of every face
 #   c.siteAt(q, ij)               the site whose cell covers a point
 #
@@ -229,17 +230,19 @@ def closedAt(x, present, outside, offs):
   return pr[x] | dil[x[:, None] + o].all(axis=1) & ~out[x]
 
 
-def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None):
+def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None, rMin=None, tol=0):
   """a hole joined to the outside by a filled path of at most 2 ceil(alpha) steps stays joined,
   through what the largest smaller closing that keeps it joined leaves open, so that a larger
   alpha keeps every grain a smaller one joins; repeated while the outside grows, as a hole that
-  joined it can bring the next one within reach; the cells a kind's radius closed, byKind, stay"""
+  joined it can bring the next one within reach; the cells a kind's radius closed, byKind, stay.
+  With the alpha complex, rMin, a cell is open at a radius its covering circumradius exceeds"""
   n = 2 * int(np.ceil(alpha))
   dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
   radii = [alpha - 1 - k for k in range(int(np.floor(alpha - 2 + 1e-10)) + 1)] + [0]
   so = stencil[:, 0] * closed.shape[1] + stencil[:, 1]
   closed, prev = closed.copy(), None
   byKind = np.zeros_like(closed) if byKind is None else byKind
+  rMin = None if rMin is None else rMin.reshape(-1)
   while prev is None or not np.array_equal(ext, prev):
     prev = ext
     f = closed & ~present & ~byKind
@@ -249,7 +252,7 @@ def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None)
       corridor = corridor[closed.reshape(-1)[corridor] & ~ext.reshape(-1)[hole[corridor]]]
       if len(corridor) == 0:
         break
-      x = corridor[~closedAt(corridor, present, outside, diskOffsets(A, r * dxy, stencil))]
+      x = corridor[~closedAt(corridor, present, outside, diskOffsets(A, r * dxy, stencil)) if rMin is None else rMin[corridor] > r * dxy + tol]
       closed.reshape(-1)[x] = False
       if ext.reshape(-1)[x[:, None] + so].any():
         ext = floodBorder(~closed, stencil)
@@ -272,18 +275,69 @@ def floodBorder(bg, stencil):
   return np.isin(labels, ext)
 
 
+# ------------------------------------------------------------------ the alpha complex
+
+def alphaComplexRadius(P, rc, cellPos, isPresent, rMax, tol):
+  """the circumradius of the smallest Delaunay triangle of the indexed positions P, of
+  circumradius at most rMax, that covers each raster cell without an indexed measurement, inf
+  where none; rc are the raster indices of P, cellPos gives the positions of flat raster cells.
+  A triangle covers the cells inside it, an edge within tol included; MATLAB's alphaComplexMask"""
+  from scipy.spatial import Delaunay
+  n1, n2 = isPresent.shape
+  rMin = np.full(n1 * n2, np.inf)
+  if len(P) < 3:
+    return rMin.reshape(n1, n2)
+  T = Delaunay(P).simplices
+  a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+  # counterclockwise, the circumradius from the side lengths over twice the area
+  area2 = (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
+  T[area2 < 0] = T[area2 < 0][:, ::-1]
+  with np.errstate(divide="ignore", invalid="ignore"):
+    R = np.linalg.norm(a - b, axis=1) * np.linalg.norm(b - c, axis=1) * np.linalg.norm(c - a, axis=1) / (2 * np.abs(area2))
+  keep = R <= rMax + tol
+  T, R = T[keep], R[keep]
+  # the box of every triangle widened by one cell, and only the boxes holding a cell without an
+  # indexed measurement, counted through the summed table of those cells
+  box = rc[T]
+  lo, hi = np.maximum(box.min(axis=1) - 1, 0), np.minimum(box.max(axis=1) + 1, [n1 - 1, n2 - 1])
+  S = np.zeros((n1 + 1, n2 + 1), dtype=np.int64)
+  S[1:, 1:] = np.cumsum(np.cumsum(~isPresent, axis=0), axis=1)
+  g = S[hi[:, 0] + 1, hi[:, 1] + 1] - S[lo[:, 0], hi[:, 1] + 1] - S[hi[:, 0] + 1, lo[:, 1]] + S[lo[:, 0], lo[:, 1]] > 0
+  T, R, lo, hi = T[g], R[g], lo[g], hi[g]
+  # the cells of every box without an indexed measurement
+  n = np.prod(hi - lo + 1, axis=1)
+  t = np.repeat(np.arange(len(n)), n)
+  q = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n)
+  nr = hi[t, 0] - lo[t, 0] + 1
+  flat = (lo[t, 0] + q % nr) * n2 + lo[t, 1] + q // nr
+  u = ~isPresent.reshape(-1)[flat]
+  t, flat = t[u], flat[u]
+  xy = cellPos(flat)
+  # inside the triangle: on the left of every edge, up to tol
+  V = P[T[t]]
+  bad = np.zeros(len(t), dtype=bool)
+  for e in range(3):
+    ev, tc = V[:, (e + 1) % 3] - V[:, e], xy - V[:, e]
+    bad |= ev[:, 0] * tc[:, 1] - ev[:, 1] * tc[:, 0] < -tol * np.maximum(np.linalg.norm(ev, axis=1), tol)
+  np.minimum.at(rMin, flat[~bad], R[t[~bad]])
+  return rMin.reshape(n1, n2)
+
+
 # ------------------------------------------------------------------ the sites
 
-def closeLattice(l, present, alpha=3.1, measured=None, rMax=None):
-  """the closing of the indexed cells on the padded raster of the lattice cells, with the indexed
-  cells, the cells outside the convex hull of the indexed cells, the pixel of every cell and the
-  lattice index of the raster's first cell; the padding leaves room for a closing by rMax. A cell
-  of the padding of a grid is not measured and lies outside the map as a cell beyond the lattice
-  does"""
+def closeLattice(l, P, present, alpha=3.1, measured=None, rMax=None, delaunay=False, tol=None):
+  """the closing of the indexed cells on the padded raster of the lattice cells, or with delaunay
+  the cells the alpha complex of the indexed positions fills; with the indexed cells, the cells
+  outside the convex hull of the indexed cells, the pixel of every cell, the lattice index of the
+  raster's first cell, the positions of flat raster cells and the covering circumradius of every
+  cell (None for the closing); the padding leaves room for a closing by rMax. A cell of the
+  padding of a grid is not measured and lies outside the map as a cell beyond the lattice does"""
   ij = l.ij
   n = len(ij)
   st = STENCIL[l.shape]
-  pad = int(np.ceil(2 * (alpha if rMax is None else rMax))) + 4
+  rMax = alpha if rMax is None else rMax
+  tol = l.dxy / 100 if tol is None else tol
+  pad = int(np.ceil(2 * rMax)) + 4
   lo = (int(ij[:, 0].min()) - pad, int(ij[:, 1].min()) - pad)
   dims = (int(ij[:, 0].max()) - lo[0] + pad + 1, int(ij[:, 1].max()) - lo[1] + pad + 1)
   a, b = ij[:, 0] - lo[0], ij[:, 1] - lo[1]
@@ -292,10 +346,25 @@ def closeLattice(l, present, alpha=3.1, measured=None, rMax=None):
   pixelOf = np.full(dims, NO_PIXEL, dtype=np.int32)
   pixelOf[a[m], b[m]] = np.arange(n, dtype=np.int32)[m]
   isPresent[a[present], b[present]] = True
+  # a cell with a measurement sits where it was measured, one without it one lattice step
+  # per index from the nearest measured cell, so that the rings and the holes follow a
+  # smooth distortion of the map as the measurements do and not the affine fit of the whole
+  from scipy import ndimage
+  near = ndimage.distance_transform_edt(pixelOf < 0, return_distances=False, return_indices=True)
+
+  def cellPos(cells):
+    sij = (np.stack(np.unravel_index(cells, dims), axis=1) + lo).astype(np.int32)
+    nearest = pixelOf.reshape(-1)[np.ravel_multi_index((near[0].reshape(-1)[cells], near[1].reshape(-1)[cells]), dims)]
+    return (P.take(nearest, axis=0) + (sij - ij.take(nearest, axis=0)).astype(P.dtype) @ l.A.T).astype(P.dtype), sij
+
   # the edge of the map is not the edge of a hole: beyond the convex hull of the indexed cells
   # the material counts as present while the closing erodes, so a gap along the edge closes
   # as one further in would
   outside = ~hullCells(isPresent)
+  if delaunay:
+    rMin = alphaComplexRadius(P[present].astype(float), np.column_stack([a, b])[present], lambda cells: cellPos(cells)[0].astype(float),
+                              isPresent, rMax * l.dxy, tol)
+    return (rMin <= alpha * l.dxy + tol) | isPresent, isPresent, outside, pixelOf, lo, cellPos, rMin
   closed = alphaClose(isPresent, l.A, alpha * l.dxy, st, outside)
   # a cell with material on more than half of its stencil is a one cell recess, which the
   # alpha shape fills; filling the mouth of a slit exposes the next cell
@@ -304,21 +373,23 @@ def closeLattice(l, present, alpha=3.1, measured=None, rMax=None):
     if not add.any():
       break
     closed |= add
-  return closed, isPresent, outside, pixelOf, lo
+  return closed, isPresent, outside, pixelOf, lo, cellPos, None
 
 
-def buildSites(l, P, present, alpha=3.1, measured=None, radii=None, connects=None, kinds=None):
+def buildSites(l, P, present, alpha=3.1, measured=None, radii=None, connects=None, kinds=None, delaunay=False, tol=None):
   """classify every lattice cell and place the sites; radii are the closing radii of the pores,
   the pockets and the cracks the closing with alpha leaves open, each replacing alpha on the cells
   of its kind, decided with the criterion connects(i, j) on pairs of pixels and the kind codes
-  given per pixel; None closes with alpha alone"""
+  given per pixel; None closes with alpha alone. With delaunay the alpha complex of the indexed
+  positions fills the gaps and a radius bounds the circumradius of a filled triangle"""
   ij = l.ij
   r = alpha * l.dxy
   st = STENCIL[l.shape]
+  tol = l.dxy / 100 if tol is None else tol
   radii = (alpha,) * 3 if radii is None else tuple(radii)
-  closed, isPresent, outside, pixelOf, lo = closeLattice(l, present, alpha, measured, max(a for a in (alpha, *radii) if np.isfinite(a)))
+  rMax = max(a for a in (alpha, *radii) if np.isfinite(a))
+  closed, isPresent, outside, pixelOf, lo, cellPos, rMin = closeLattice(l, P, present, alpha, measured, rMax, delaunay, tol)
   dims = closed.shape
-  hasPixel = pixelOf >= 0
   # a kind's radius replaces alpha on the cells of its kind: below alpha it reopens what the
   # closing filled, 0 leaves the kind open, inf fills it whole; what it closes stays closed
   byKind = np.zeros(dims, dtype=bool)
@@ -326,10 +397,13 @@ def buildSites(l, P, present, alpha=3.1, measured=None, radii=None, connects=Non
     kindP = kindOfParts(closed, isPresent, outside, pixelOf, connects, kinds, st, l.A)[0].reshape(-1)
     for k, a in enumerate(radii, 1):
       x = np.flatnonzero(kindP == k) if a != alpha else np.zeros(0, dtype=np.int64)
-      c = np.ones(len(x), dtype=bool) if np.isinf(a) else closedAt(x, isPresent, outside, diskOffsets(l.A, a * l.dxy, st))
+      if rMin is not None:
+        c = rMin.reshape(-1)[x] <= a * l.dxy + tol
+      else:
+        c = np.ones(len(x), dtype=bool) if np.isinf(a) else closedAt(x, isPresent, outside, diskOffsets(l.A, a * l.dxy, st))
       byKind.reshape(-1)[x[c]] = True
       closed.reshape(-1)[x] = c
-  closed, ext = openCorridors(closed, floodBorder(~closed, st), isPresent, outside, l.A, alpha, st, byKind)
+  closed, ext = openCorridors(closed, floodBorder(~closed, st), isPresent, outside, l.A, alpha, st, byKind, rMin, tol)
   material = ~ext
   filled = closed & ~isPresent                 # the neighbours grow into these
   # a cell reaches as far as the widest filled region: the closing bounds that by alpha, a kind's
@@ -354,17 +428,6 @@ def buildSites(l, P, present, alpha=3.1, measured=None, radii=None, connects=Non
   # into a grain of its own
   onMap = material.reshape(-1)[flat]
   pixel = np.where(onMap, pixelOf.reshape(-1)[flat], NO_PIXEL).astype(np.int32)
-  # a cell with a measurement sits where it was measured, one without it one lattice step
-  # per index from the nearest measured cell, so that the rings and the holes follow a
-  # smooth distortion of the map as the measurements do and not the affine fit of the whole
-  from scipy import ndimage
-  near = ndimage.distance_transform_edt(~hasPixel, return_distances=False, return_indices=True)
-
-  def cellPos(cells):
-    sij = (np.stack(np.unravel_index(cells, dims), axis=1) + lo).astype(np.int32)
-    nearest = pixelOf.reshape(-1)[np.ravel_multi_index((near[0].reshape(-1)[cells], near[1].reshape(-1)[cells]), dims)]
-    return (P.take(nearest, axis=0) + (sij - ij.take(nearest, axis=0)).astype(P.dtype) @ l.A.T).astype(P.dtype), sij
-
   pos, sij = cellPos(flat)
   # a site on the map without an indexed pixel is a hole, part of a notIndexed grain
   isHole = onMap & ~isPresent.reshape(-1)[flat]
@@ -576,13 +639,14 @@ def _gridKey(u):
   return key[:, 0] * (key[:, 1].max(initial=0) - key[:, 1].min(initial=0) + 1) + key[:, 1]
 
 
-def decompose(ebsd, alpha=3.1, tol=None, backend=None, alphaPore=np.inf, alphaPocket=None, alphaCrack=0, kinds=None,
-              criterion=None):
+def decompose(ebsd, alpha=None, tol=None, backend=None, alphaPore=np.inf, alphaPocket=None, alphaCrack=0, kinds=None,
+              criterion=None, delaunay=False):
   """the spatial decomposition of a map into one cell around every pixel, the cell complex
   calcGrains builds the grains from; MATLAB's spatialDecomposition
 
     cells = decompose(ebsd)              # the cells of the map
     cells = decompose(ebsd, alpha=5)     # wider holes filled
+    cells = decompose(ebsd, delaunay=True)   # the gaps filled by the alpha complex
 
   The cell of a pixel is its Voronoi cell among the lattice neighbours within reach, so a
   cell of a square or hexagonal grid is its unit cell. The map must lie on a lattice; a map
@@ -604,8 +668,12 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None, alphaPore=np.inf, alphaPo
     cells - cellComplex: the vertices V, the vertex pair F and the site pair of every face,
         the sites with the pixel each stands for (site2pixel), and the lattice
   Keywords
-    alpha - the closing radius in pixel spacings: a not indexed region narrower than 2 alpha
-        is filled and its neighbours grow in, a wider one is kept
+    alpha - the closing radius in pixel spacings, 3.1 by default: a not indexed region narrower
+        than 2 alpha is filled and its neighbours grow in, a wider one is kept. With delaunay
+        the circumradius bound of the alpha complex, 2.2 by default, a different quantity
+    delaunay - fill the gaps by the alpha complex of the indexed pixels, the Delaunay triangles
+        whose circumradius is at most alpha pixel spacings, instead of the closing with a disk;
+        exact, where the closing is a raster approximation, and the choice for a large alpha
     alphaPore - the closing radius of the pores in place of alpha, inf by default, which fills
         them whole
     alphaPocket - the closing radius of the pockets, alpha by default
@@ -622,6 +690,7 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None, alphaPore=np.inf, alphaPo
   l = ebsd.lattice
   if l is None:
     raise ValueError("the map is not on a lattice, so it cannot be decomposed")
+  alpha = defaultAlpha(alpha, delaunay)
   P = l.plane.to2d(ebsd.pos.data.reshape(-1, 3))
   present = ebsd.isIndexed.reshape(-1)
   crit = gbcAngle() if criterion is None else criterion
@@ -631,13 +700,19 @@ def decompose(ebsd, alpha=3.1, tol=None, backend=None, alphaPore=np.inf, alphaPo
     return np.asarray(connectivity(crit, ebsd, i, j)) > 0
 
   radii = (alphaPore, alpha if alphaPocket is None else alphaPocket, alphaCrack)
-  sites = buildSites(l, P, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1), radii, connects, kindCodes(kinds))
+  tol = l.dxy / 100 if tol is None else tol
+  sites = buildSites(l, P, present, alpha, None if ebsd._pad is None else ~ebsd._pad.reshape(-1), radii, connects, kindCodes(kinds), delaunay, tol)
   cells, verts, unbounded = localVoronoi(sites, l.A, max(alpha, sites.reach), backend=backend)
   if unbounded:
     warnings.warn(f"the decomposition left {unbounded} cells of the map open; its sites reach beyond the closing")
-  V, F, cells = meshVertices(cells, verts, l.dxy / 100 if tol is None else tol, backend=backend)
+  V, F, cells = meshVertices(cells, verts, tol, backend=backend)
   keep = joinHoles(sites, cells)
   return cellComplex(V, F[keep], cells[keep], sites, l.A, l.plane, l.shape)
+
+
+def defaultAlpha(alpha, delaunay=False):
+  """alpha as given, or its default: 3.1 for the closing, 2.2 for the alpha complex"""
+  return (2.2 if delaunay else 3.1) if alpha is None else alpha
 
 
 def joinHoles(sites, cells):

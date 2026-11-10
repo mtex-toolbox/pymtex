@@ -3,12 +3,13 @@ function bench_calcgrains_ops(out, ops, K)
 
 maps = struct;
 names = {'small','peridotite_2.1','peridotite_6.1','peridotite_16.1','forsterite','forsterite_5','cracks', ...
-  'peridotite_15','peridotite_pocket10','peridotite_pocket10_crack15'};
+  'peridotite_15','peridotite_pocket10','peridotite_pocket10_crack15','peridotite_delaunay'};
 args = {{'angle',10*degree,'minPixel',5}, {'alpha',2.1,'minPixel',5}, {'alpha',6.1,'minPixel',5}, ...
   {'alpha',16.1,'minPixel',5}, {}, {'minPixel',5}, {'angle',5*degree}, {'angle',15*degree,'minPixel',5}, ...
-  {'angle',15*degree,'minPixel',5,'alphaPocket',10}, {'angle',15*degree,'minPixel',5,'alphaPocket',10,'alphaCrack',15}};
+  {'angle',15*degree,'minPixel',5,'alphaPocket',10}, {'angle',15*degree,'minPixel',5,'alphaPocket',10,'alphaCrack',15}, ...
+  {'angle',15*degree,'minPixel',5,'delaunay'}};
 src = {'small','peridotite','peridotite','peridotite','forsterite','forsterite','T1_clean_cracks', ...
-  'peridotite','peridotite','peridotite'};
+  'peridotite','peridotite','peridotite','peridotite'};
 ops = cellstr(ops);
 for k = 1:numel(names)
   if any(startsWith(ops, names{k})) && ~isfield(maps, fieldName(src{k})), maps.(fieldName(src{k})) = load(src{k}); end

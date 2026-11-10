@@ -3,25 +3,25 @@
 from typing import Literal
 
 # the data sets mtexdata reads
-SampleDataName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "olivine", "twins",
-                         "copper", "single", "alu", "titanium", "ferrite", "dc06", "martensite", "emsland",
-                         "alphaBetaTitanium", "EMSphinx", "testgrains", "dubna", "geesthacht", "steel", "ptx", "zncuti",
-                         "aachenexp", "dubnaODF", "eclogite", "vectors", "dubnaValues", "smiley", "tongue", "vpsc",
-                         "trueEbsdWCCoSmall", "xnovo", "SmallIN100", "odf", "quartzPiezo", "olivine1997",
-                         "quartzPattern"]
+SampleDataName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "peridotite",
+                         "olivine", "twins", "copper", "single", "alu", "titanium", "ferrite", "dc06", "martensite",
+                         "emsland", "alphaBetaTitanium", "EMSphinx", "testgrains", "dubna", "geesthacht", "steel",
+                         "ptx", "zncuti", "aachenexp", "dubnaODF", "eclogite", "vectors", "dubnaValues", "smiley",
+                         "tongue", "vpsc", "trueEbsdWCCoSmall", "xnovo", "SmallIN100", "odf", "quartzPiezo",
+                         "olivine1997", "quartzPattern"]
 
 # the data sets mtexdatafile fetches, those of the data repository included
-SampleFileName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "olivine", "twins",
-                         "copper", "single", "alu", "titanium", "ferrite", "dc06", "martensite", "emsland",
-                         "alphaBetaTitanium", "EMSphinx", "testgrains", "dubna", "geesthacht", "steel", "ptx", "zncuti",
-                         "aachenexp", "dubnaODF", "eclogite", "vectors", "dubnaValues", "smiley", "tongue", "vpsc",
-                         "trueEbsdWCCoSmall", "xnovo", "SmallIN100", "odf", "quartzPiezo", "olivine1997",
-                         "quartzPattern", "3d", "copper29", "my100grains", "trueEbsdWCCo"]
+SampleFileName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "peridotite",
+                         "olivine", "twins", "copper", "single", "alu", "titanium", "ferrite", "dc06", "martensite",
+                         "emsland", "alphaBetaTitanium", "EMSphinx", "testgrains", "dubna", "geesthacht", "steel",
+                         "ptx", "zncuti", "aachenexp", "dubnaODF", "eclogite", "vectors", "dubnaValues", "smiley",
+                         "tongue", "vpsc", "trueEbsdWCCoSmall", "xnovo", "SmallIN100", "odf", "quartzPiezo",
+                         "olivine1997", "quartzPattern", "3d", "copper29", "my100grains", "trueEbsdWCCo"]
 
 # the maps among them
-SampleEBSDName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "olivine", "twins",
-                         "copper", "single", "alu", "titanium", "ferrite", "dc06", "martensite", "emsland",
-                         "alphaBetaTitanium", "EMSphinx", "eclogite", "trueEbsdWCCoSmall"]
+SampleEBSDName = Literal["aachen", "sharp", "small", "csl", "mylonite", "epidote", "forsterite", "peridotite",
+                         "olivine", "twins", "copper", "single", "alu", "titanium", "ferrite", "dc06", "martensite",
+                         "emsland", "alphaBetaTitanium", "EMSphinx", "eclogite", "trueEbsdWCCoSmall"]
 
 # the grains among them
 SampleGrainsName = Literal["testgrains"]
@@ -72,22 +72,23 @@ DocPageName = Literal["BoundaryTutorial", "EBSDTutorial", "GrainTutorial", "ODFT
                       "EBSDSharpPlot", "EBSDSimulation", "EBSDSpatialTransform", "EBSDTrueEbsd", "Dream3dGrains",
                       "EllipseBasedParameters", "Grain_dispersion_axes", "GrainExport", "GrainMerge", "GrainNeighbours",
                       "GrainOrientationParameters", "GrainReconstruction", "GrainReconstructionAdvanced",
-                      "GrainReconstructionMCL", "GrainSpatialPlots", "HullBasedParameters", "ProjectionBasedParameters",
-                      "SelectingGrains", "ShapeParameters", "BoundaryCurvature", "BoundaryIntersections",
-                      "BoundaryMisorientations", "BoundaryNormalDistribution", "BoundaryPlots", "BoundaryProperties",
-                      "BoundarySelect", "CSLBoundaries", "GrainSmoothing", "GrainSmoothingAdvanced", "QuadruplePoints",
-                      "SubGrainBoundaries", "TiltAndTwistBoundaries", "TriplePoints", "TwinningBoundaries",
-                      "EBSD3Analysis", "EBSD3Plotting", "Grains3D", "Grains3DBoundaries", "Grains3DOperations",
-                      "Grains3DProperties", "Grains3DReconstruction", "Grains3DSmoothing", "NeperInterface",
-                      "BirefringenceDemo", "MagneticAnisotropy", "PiezoElectricity", "TensorArithmetics",
-                      "TensorAverage", "TensorDefinition", "TensorImport", "TensorVisualisation", "AnisotropicTheory",
-                      "CPOSeismicProperties", "IsotropicTheory", "WaveVelocities", "DislocationSystems", "GND",
-                      "Lankford", "SachsModel", "SchmidFactor", "SingleSlipModel", "SlipSystems", "SlipTransmission",
-                      "TaylorHex", "TaylorModel", "TextureEvolution", "TwinningTutorial", "VPSCImport", "WBV",
-                      "GrainGraphBasedReconstruction", "LowLevelParentGrainReconstruction",
-                      "MaParentGrainReconstruction", "MaParentGrainReconstructionAdvanced", "MartensiteVariants",
-                      "OrientationRelationshipFit", "ParentChildVariants", "PhaseTransitions", "TiBetaReconstruction",
-                      "TransformationTexture", "TriplePointBasedReconstruction", "S1FunHarmonics", "S2Bingham",
+                      "GrainReconstructionCracks", "GrainReconstructionMCL", "GrainSpatialPlots", "HullBasedParameters",
+                      "ProjectionBasedParameters", "SelectingGrains", "ShapeParameters", "BoundaryCurvature",
+                      "BoundaryIntersections", "BoundaryMisorientations", "BoundaryNormalDistribution", "BoundaryPlots",
+                      "BoundaryProperties", "BoundarySelect", "CSLBoundaries", "GrainSmoothing",
+                      "GrainSmoothingAdvanced", "QuadruplePoints", "SubGrainBoundaries", "TiltAndTwistBoundaries",
+                      "TriplePoints", "TwinningBoundaries", "EBSD3Analysis", "EBSD3Plotting", "Grains3D",
+                      "Grains3DBoundaries", "Grains3DOperations", "Grains3DProperties", "Grains3DReconstruction",
+                      "Grains3DSmoothing", "NeperInterface", "BirefringenceDemo", "MagneticAnisotropy",
+                      "PiezoElectricity", "TensorArithmetics", "TensorAverage", "TensorDefinition", "TensorImport",
+                      "TensorVisualisation", "AnisotropicTheory", "CPOSeismicProperties", "IsotropicTheory",
+                      "WaveVelocities", "DislocationSystems", "GND", "Lankford", "SachsModel", "SchmidFactor",
+                      "SingleSlipModel", "SlipSystems", "SlipTransmission", "TaylorHex", "TaylorModel",
+                      "TextureEvolution", "TwinningTutorial", "VPSCImport", "WBV", "GrainGraphBasedReconstruction",
+                      "LowLevelParentGrainReconstruction", "MaParentGrainReconstruction",
+                      "MaParentGrainReconstructionAdvanced", "MartensiteVariants", "OrientationRelationshipFit",
+                      "ParentChildVariants", "PhaseTransitions", "TiBetaReconstruction", "TransformationTexture",
+                      "TriplePointBasedReconstruction", "S1FunHarmonics", "S2Bingham",
                       "S2FunApproximationInterpolation", "S2FunAxisField", "S2FunConcept",
                       "S2FunHarmonicRepresentation", "S2FunOperations", "S2FunPlotting", "S2FunQuadrature",
                       "S2FunRadon", "S2FunSampling", "S2FunSym", "S2FunVectorField", "S2FunVectorValued", "S2Kernels",

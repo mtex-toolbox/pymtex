@@ -3,9 +3,10 @@ import numpy as np
 import pytest
 
 from mtex import EBSD, phaseList, crystalFrame, rotation, vector3d, zvector, degree, shift, decompose
-from mtex.maps.decomposition import alphaClose, dilate, localVoronoi, meshVertices, NO_PIXEL
+from mtex.maps.decomposition import alphaClose, alphaComplexRadius, defaultAlpha, dilate, localVoronoi, meshVertices, NO_PIXEL
 from mtex.maps.lattice import STENCIL
 from mtex.geometry.kernels import _jit
+from conftest import close
 
 CSTEST = crystalFrame("m-3m", mineral="test")
 SQ2 = np.eye(2)
@@ -198,3 +199,26 @@ def test_the_ends_of_a_vanishing_face_weld(backend):
 def test_a_gather_fills_where_the_index_is_negative():
   from mtex.maps.decomposition import _gather
   assert np.array_equal(_gather(np.array([10, 20, 30]), np.array([[2, -1], [0, 1]]), -5), [[30, -5], [10, 20]])
+
+
+def test_the_alpha_complex_covers_a_hole_by_the_circumradius_of_its_triangles():
+  # on a unit square lattice every triangle inside the material has circumradius 1/sqrt(2); a
+  # 5 x 5 hole is covered by the triangles across it, of circumradius 3 at its centre
+  n = 15
+  isPresent = np.ones((n, n), dtype=bool)
+  isPresent[5:10, 5:10] = False
+  rc = np.argwhere(isPresent)
+  P = rc.astype(float)
+  cellPos = lambda cells: np.column_stack(np.divmod(cells, n)).astype(float)
+  rMin = alphaComplexRadius(P, rc, cellPos, isPresent, 10.0, 1e-2)
+  hole = rMin[5:10, 5:10]
+  assert np.isinf(rMin[isPresent]).all() and np.isfinite(hole).all() and close(hole.max(), 3.0, 1e-9) and close(hole[0, 0], np.sqrt(2.5), 1e-9)
+  assert np.isinf(alphaComplexRadius(P, rc, cellPos, isPresent, 1.5, 1e-2)[5:10, 5:10]).all()
+
+
+def test_the_alpha_complex_keeps_what_its_bound_does_not_cover():
+  # the hole of radius 4 is kept at the default bound 2.2 and filled at 6, wider than its widest triangle
+  n = 26
+  e = decompMap(SQ2, n, holes=((n // 2, n // 2, 4.0),))
+  assert defaultAlpha(None, True) == 2.2 and defaultAlpha(None) == 3.1 and defaultAlpha(5, True) == 5
+  assert decompose(e, delaunay=True, alphaPore=2.2).sites.isHole.any() and not decompose(e, alpha=6, delaunay=True, alphaPore=6).sites.isHole.any()
