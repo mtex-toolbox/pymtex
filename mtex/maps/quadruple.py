@@ -44,8 +44,8 @@ def quadruplePoints(c, seg):
 
 
 # the faces at every vertex of verts, among the candidates or all of them: the face, the direction
-# of its other end from the vertex, which vertex it belongs to and at which end; a vertex's faces
-# are consecutive, ordered counterclockwise
+# of its other end from the vertex on the lattice, before the straightening moved them, which vertex
+# it belongs to and at which end; a vertex's faces are consecutive, ordered counterclockwise
 def _incidentFaces(c, verts, candidates=None):
   F = c.F if candidates is None else c.F[candidates]
   slot = np.full(len(c.V), -1, dtype=np.int32)
@@ -53,7 +53,7 @@ def _incidentFaces(c, verts, candidates=None):
   r = slot[F]
   f, side = np.nonzero(r >= 0)
   owner = r[f, side]
-  d = c.V[F[f, 1 - side]] - c.V[verts[owner]]
+  d = c.V0[F[f, 1 - side]] - c.V0[verts[owner]]
   angle = np.arctan2(d[:, 1], d[:, 0])
   order = np.lexsort((angle, owner))
   faces = f if candidates is None else candidates[f]
@@ -150,7 +150,8 @@ def splitQuadruplePoints(c, seg, ebsd, crit, backend=None):
   # every face from the first moving face counterclockwise to the second ends at the copy instead
   F = c.F.copy()
   incident, angle, owner, side = _incidentFaces(c, verts)
-  a0, a1 = (np.arctan2(d[rows, at(k), 1], d[rows, at(k), 0]) for k in (0, 1))
+  d0 = c.V0[_farVertex(c, verts[:, None], faces)] - c.V0[verts][:, None, :]
+  a0, a1 = (np.arctan2(d0[rows, at(k), 1], d0[rows, at(k), 0]) for k in (0, 1))
   move = np.mod(angle - a0[owner], 2 * np.pi) <= np.mod(a1[owner] - a0[owner], 2 * np.pi)
   F[incident[move], side[move]] = new[owner[move]]
   newF = np.stack([verts, new], axis=1).astype(np.int32)

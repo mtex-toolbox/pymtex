@@ -348,13 +348,15 @@ def test_a_wide_crack_bridged_whole_leaves_no_notIndexed_grain():
   # MATLAB's checkWideCrack: a crack far wider than 2 alpha on a 150 x 60 map, bridged with
   # alphaCrack inf, so the cells reached across the fill: 30 grains of the 40 blocks, the middle
   # block column being inside the crack, and away from the map edge, where the exterior takes a
-  # notch, the only pixels without a grain lie on the boundary down the middle of the crack
+  # notch, the only pixels without a grain lie on the boundary down the middle of the crack and,
+  # three on either side of it, on rows 31 and 120, as in MATLAB develop
   from test_kinds import blockMap
   e, r, c = blockMap(150, 60, 15, lambda r, c: (c >= 23) & (c <= 47))
   g = calcGrains(e, threshold=5 * degree, alphaCrack=np.inf)
   r, c = r.reshape(-1), c.reshape(-1)
   away = (r > 16) & (r < 135)
-  assert g.isIndexed.all() and len(g) == 30 and np.array_equal((e.grainId == 0) & away, (c == 35) & away)
+  hole = (c == 35) | np.isin(r, (31, 120)) & (abs(c - 35) <= 3)
+  assert g.isIndexed.all() and len(g) == 30 and np.array_equal((e.grainId == 0) & away, hole & away)
 
 
 def test_a_grain_whose_boundary_does_not_close_is_named():

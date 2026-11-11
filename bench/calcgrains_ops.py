@@ -52,9 +52,10 @@ ALGORITHM = [
   {"name": "boundary straightening",
    "entry": {"matlab": ["@EBSD.calcGrains", "straightenInFill"], "python": ["mtex.maps.calcgrains.calcGrains", "mtex.maps.straighten.straightenInFill"]},
    "cases": {op: f"calcGrains of {MAPS[op][0]} {MAPS[op][1]}, straight through the filled cells" for op in MAPS},
-   # STRAIGHT: a cut point moves by up to 1/2^17 of its segment; where MATLAB's swept-area samples,
-   # ceil(3 len / dxy) of a segment of exactly one pixel, flip with the rounding of len, a vertex is held
-   # in one port and moved in the other (forsterite: one chain of five segments, peridotite none)
+   # STRAIGHT: a cut point moves by up to 1/2^17 of its segment; a cycle of inner vertices takes its
+   # node at its first vertex, which the ports number differently, so the vertices along it lie
+   # elsewhere on the same curve; a junction clipped onto a cell side leaves it or not by the rounding
+   # of the next step's exit (forsterite: about seven places, at most 0.2 pixels apart as curves)
    "tolerance": {op: None for op in OPS}},
   {"name": "notIndexed kinds",
    "entry": {"matlab": ["@EBSD.classifyNotIndexed", "kindOfParts"], "python": ["mtex.maps.calcgrains.classifyNotIndexed", "mtex.maps.kinds.kindOfParts"]},

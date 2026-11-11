@@ -15,6 +15,7 @@
 # neighbours grow in; and the band and dummy rings outside the map bound its outer cells.
 from __future__ import annotations
 
+import copy
 import warnings
 
 import numpy as np
@@ -443,15 +444,40 @@ class fillDistance:
   filled cells and the others within two cells of them"""
 
   def __init__(self, fill, lo, P, ij, origin, A, stencil, cellPos):
-    self.fill, self.lo = fill, np.asarray(lo)
+    self.lo, self.stencil, self.cellPos = np.asarray(lo), stencil, cellPos
     self.p0, self.M = np.asarray(origin, dtype=float), np.asarray(A, dtype=float).T
     dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
     self.rigid = np.mean(np.linalg.norm(P - self.p0 - ij @ self.M, axis=1)) / dxy < 1e-2
     self.Minv = np.linalg.inv(self.M)
+    self._setFill(fill)
+
+  def _setFill(self, fill):
+    self.fill = fill
     if not self.rigid:
       from scipy.spatial import cKDTree
-      ring = dilate(dilate(fill, stencil), stencil) & ~fill
-      self.F, self.O = (cKDTree(cellPos(np.flatnonzero(m))[0].astype(float)) for m in (fill, ring))
+      ring = dilate(dilate(fill, self.stencil), self.stencil) & ~fill
+      self.F, self.O = (cKDTree(self.cellPos(np.flatnonzero(m))[0].astype(float)) for m in (fill, ring))
+
+  def masked(self, fill):
+    """the same test for the cells of another mask over the raster"""
+    t = copy.copy(self)
+    t._setFill(fill)
+    return t
+
+  def cell2pos(self, u):
+    """the positions of the raster cells u, (i, j) from 0, also between the cells: the lattice on a
+    rigid one, else bilinear between the positions of the cells around"""
+    u = np.asarray(u, dtype=float).reshape(-1, 2)
+    if self.rigid:
+      return self.p0 + (u + self.lo) @ self.M
+    f = np.floor(u)
+    t, f = u - f, f.astype(np.int64)
+    out = np.zeros((len(u), 2))
+    for k in ((0, 0), (1, 0), (0, 1), (1, 1)):
+      c = np.clip(f + k, 0, np.array(self.fill.shape) - 1)
+      w = np.prod(np.where(k, t, 1 - t), axis=1)
+      out += w[:, None] * self.cellPos(np.ravel_multi_index((c[:, 0], c[:, 1]), self.fill.shape))[0]
+    return out
 
   @property
   def lattice(self):
