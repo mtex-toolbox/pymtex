@@ -151,16 +151,25 @@ def diskOffsets(A, r, stencil):
 
 
 def dilate(m, offs):
-  """binary dilation of a raster mask by a set of index offsets, with zero padding"""
+  """binary dilation of a raster mask by a set of index offsets, with zero padding; a run of
+  offsets with one di and consecutive dj is one window, covered by two of the 2^k cells of a row"""
   m = np.asarray(m, dtype=bool)
-  offs = np.asarray(offs, dtype=int).reshape(-1, 2)
+  offs = np.unique(np.asarray(offs, dtype=int).reshape(-1, 2), axis=0)
   out = np.zeros_like(m)
   n1, n2 = m.shape
-  for di, dj in offs:
-    r0, r1 = max(0, di), min(n1, n1 + di)
-    c0, c1 = max(0, dj), min(n2, n2 + dj)
-    if r0 < r1 and c0 < c1:
-      out[r0:r1, c0:c1] |= m[r0 - di:r1 - di, c0 - dj:c1 - dj]
+  W = int(np.abs(offs[:, 1]).max(initial=0))
+  # H[k][:, j] whether any of the cells j .. j + 2^k - 1 of a row of m, padded by W each side, is set
+  H = [np.pad(m, ((0, 0), (W, W)))]
+  start = (np.diff(offs[:, 0], prepend=offs[:1, 0] - 1) != 0) | (np.diff(offs[:, 1], prepend=0) != 1)
+  for (di, a), b in zip(offs[start], offs[np.roll(start, -1), 1]):
+    k = int(b - a + 1).bit_length() - 1
+    while len(H) <= k:
+      h, p = H[-1], 2 ** (len(H) - 1)
+      H.append(h.copy())
+      H[-1][:, :-p] |= h[:, p:]
+    r0, r1, h, q = max(0, di), min(n1, n1 + di), H[k], W - a - 2 ** k + 1
+    if r0 < r1:
+      out[r0:r1] |= h[r0 - di:r1 - di, W - b:W - b + n2] | h[r0 - di:r1 - di, q:q + n2]
   return out
 
 
@@ -168,9 +177,13 @@ def alphaClose(present, A, r, stencil, outside=None):
   """the closing of a set by a disk of radius r: the cells no empty disk of that radius
   covers, as the De Morgan pair of dilations; the cells outside count as present while it
   erodes and are clipped away after"""
-  offs = diskOffsets(np.asarray(A, dtype=float), r, np.asarray(stencil))
   present = np.asarray(present, dtype=bool)
-  outside = np.zeros_like(present) if outside is None else outside
+  return closeBy(present, np.zeros_like(present) if outside is None else outside, diskOffsets(np.asarray(A, dtype=float), r, np.asarray(stencil)))
+
+
+def closeBy(present, outside, offs):
+  """the closing of the present cells by the offsets, the cells outside present while it erodes
+  and clipped away after"""
   return ~dilate(~(dilate(present, offs) | outside), offs) & ~outside | present
 
 
@@ -221,14 +234,13 @@ def geoDist(seed, mask, stencil, n):
 
 
 def closedAt(x, present, outside, offs):
-  """the closing of the present cells by the offsets, at the flat raster cells x alone"""
-  o = offs[:, 0] * present.shape[1] + offs[:, 1]
-  pr, out = present.reshape(-1), outside.reshape(-1)
-  y = np.unique((x[:, None] + o).reshape(-1))
-  y = y[~out[y]]
-  dil = out.copy()
-  dil[y] = pr[y[:, None] + o].any(axis=1)
-  return pr[x] | dil[x[:, None] + o].all(axis=1) & ~out[x]
+  """the closing of the present cells by the offsets, at the flat raster cells x alone, over the
+  box around them that the two dilations read"""
+  i, j = np.unravel_index(x, present.shape)
+  w = 2 * int(np.abs(offs).max(initial=0))
+  r0, c0 = max(int(i.min(initial=0)) - w, 0), max(int(j.min(initial=0)) - w, 0)
+  box = np.s_[r0:int(i.max(initial=0)) + w + 1, c0:int(j.max(initial=0)) + w + 1]
+  return closeBy(present[box], outside[box], offs)[i - r0, j - c0]
 
 
 def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None, rMin=None, tol=0):
@@ -779,30 +791,31 @@ def splitPinches(c):
   isP[cand] = np.bincount(c.F[near].reshape(-1), minlength=len(c.V))[cand] == 4
   if not isP.any():
     return c
-  V, F, cells = c.V.copy(), c.F.copy(), c.cells.copy()
   cell = px.max(axis=1)
   side = np.where(px[:, 0] >= 0, c.cells[:, 0], c.cells[:, 1])
-  for v in np.flatnonzero(isP):
-    # the four faces at v counterclockwise, the first two around one cell
-    e = np.flatnonzero(np.any(c.F == v, axis=1) & (nC > 0))
-    u = V[F[e].sum(axis=1) - v] - V[v]
+  # the four faces at every pinch, a row per pinch in vertex order, and the new vertex of each
+  f, k = np.nonzero(isP[c.F] & (nC > 0)[:, None])
+  E = f[np.lexsort((f, c.F[f, k]))].reshape(-1, 4)
+  v = np.flatnonzero(isP)
+  n = len(c.V) + np.arange(len(v))
+  inside = np.zeros(len(v), dtype=bool) if c.inFill is None else c.inFill(c.V[v]) > c.dxy / 100
+  V, F = np.vstack([c.V, np.zeros((len(v), 2))]), c.F.copy()
+  for k, e in enumerate(E):
+    # the four faces counterclockwise, the first two around one cell
+    u = V[F[e].sum(axis=1) - v[k]] - V[v[k]]
     o = np.argsort(np.arctan2(u[:, 1], u[:, 0]), kind="stable")
     if cell[e[o[0]]] != cell[e[o[1]]]:
       o = np.roll(o, -1)
-    e, u = e[o], u[o] / np.linalg.norm(u[o], axis=1)[:, None]
-    n = len(V)
-    if c.inFill is not None and c.inFill(V[v])[0] > c.dxy / 100:
-      keep, move = [1, 2], [3, 0]
-      F = np.vstack([F, [[v, n]]])
-      cells = np.vstack([cells, [np.sort([side[e[0]], side[e[2]]])]])
-    else:
-      keep, move = [0, 1], [2, 3]
+    E[k], u = e[o], u[o] / np.linalg.norm(u[o], axis=1)[:, None]
+    keep, move = ([1, 2], [3, 0]) if inside[k] else ([0, 1], [2, 3])
     w = u[move].sum(axis=0)
-    V = np.vstack([V, V[v] + c.dxy / 4 * w / np.linalg.norm(w)])
+    V[n[k]] = V[v[k]] + c.dxy / 4 * w / np.linalg.norm(w)
     w = u[keep].sum(axis=0)
-    V[v] = V[v] + c.dxy / 4 * w / np.linalg.norm(w)
-    F[e[move]] = np.where(F[e[move]] == v, n, F[e[move]])
+    V[v[k]] = V[v[k]] + c.dxy / 4 * w / np.linalg.norm(w)
+    F[E[k, move]] = np.where(F[E[k, move]] == v[k], n[k], F[E[k, move]])
+  # a join inside the filled cells is a face of the two cells across it
+  F = np.vstack([F, np.column_stack([v[inside], n[inside]])])
+  cells = np.vstack([c.cells, np.sort(side[E[inside][:, [0, 2]]], axis=1)])
   return cellComplex(V.astype(c.V.dtype), F.astype(c.F.dtype), cells.astype(c.cells.dtype), c.sites, c.A, c.plane, c.shape)
-
 
 __all__ = ["decompose", "cellComplex"]

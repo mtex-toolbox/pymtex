@@ -106,13 +106,14 @@ def kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, 
   pix = pixelOf.reshape(-1)
   tf = same(pix[cell[a]], pix[cell[b]])
   cl = components(nC, a[tf], b[tf])
-  # the rim pieces of one part joined once more when their first cells connect
+  # the rim pieces of one part joined once more when their first cells connect, except on the
+  # border, where a part is a void whatever its rim
   _, first, piece = np.unique(cl, return_index=True, return_inverse=True)
   piece = piece.reshape(-1)
   pp = part[first]
   po = np.argsort(pp, kind="stable")
   cnt = np.bincount(pp, minlength=nP)
-  pairs = [np.column_stack(np.triu_indices(c, 1)) + s for c, s in zip(cnt, np.cumsum(cnt) - cnt) if c > 1]
+  pairs = [np.column_stack(np.triu_indices(c, 1)) + s for c, s in zip(np.where(border, 0, cnt), np.cumsum(cnt) - cnt) if c > 1]
   pairs = po[np.vstack(pairs)] if pairs else np.zeros((0, 2), dtype=np.int64)
   tf = same(pix[cell[first[pairs[:, 0]]]], pix[cell[first[pairs[:, 1]]]])
   cl = components(len(first), pairs[tf, 0], pairs[tf, 1])[piece]
