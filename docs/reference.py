@@ -259,7 +259,7 @@ class Shown:
 
 
 def shownDefault(v):
-  if isinstance(v, type):
+  if isinstance(v, type) or inspect.isfunction(v):
     return Shown(("np." if v.__module__ == "numpy" else "") + v.__name__)
   if isinstance(v, float) and v not in (0.0,) and np.isfinite(v):
     d = v / mtex.degree

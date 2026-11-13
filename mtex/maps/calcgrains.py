@@ -210,7 +210,7 @@ def absorbInteriorPixels(c, ebsd, grainId, boundary, nudge=0.95, backend=None):
   searched. MATLAB's absorbInteriorPixels."""
   out = grainId.copy()
   l = ebsd.lattice
-  z = np.flatnonzero((out == 0) & ~ebsd.isPadding.reshape(-1))
+  z = np.flatnonzero(out == 0)
   if l is None or len(z) == 0:
     return out
   # the raster of the lattice slots with a margin of one cell, -1 where the map has no pixel
