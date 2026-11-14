@@ -22,11 +22,11 @@ import numpy as np
 from ..geometry.symreduce import chordAngle, closestImage
 from .boundary import buildBoundary
 from .criteria import DEFAULT_ANGLE, connectivity, gbcAngle, gbcEqual, grainBoundaryCriterion
-from .decomposition import closeLattice, decompose, defaultAlpha, splitPinches
+from .decomposition import closeKinds, closeLattice, decompose, defaultAlpha, splitPinches
 from .criteria.fmc import gbcFMC
 from .grains import grain2d
 from .kernels import absorbNumba, grainKernel
-from .kinds import INDEXED, KINDS, SPECK, VOID, kindCodes, kindOfParts
+from .kinds import INDEXED, KINDS, SPECK, VOID, kindCodes
 from .lattice import STENCIL
 from .quadruple import splitQuadruplePoints
 from .segment import segment
@@ -93,7 +93,8 @@ def calcGrains(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, minPix
   return grains
 
 
-def classifyNotIndexed(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=None, kinds=None, delaunay=False):
+def classifyNotIndexed(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None, alpha=None, alphaPore=np.inf, alphaPocket=None,
+                       alphaCrack=0, kinds=None, delaunay=False):
   """the kinds of the notIndexed regions of a map, as calcGrains sees them; MATLAB's classifyNotIndexed
 
     kinds, parts = classifyNotIndexed(ebsd, alpha=3.1)
@@ -106,7 +107,9 @@ def classifyNotIndexed(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None
   The closing with alpha fills every notIndexed region narrower than about 2 alpha pixels. What
   it leaves open are the thick parts, and each of them is a pore, a pocket, a crack or a void.
   calcGrains closes a part with the radius of its kind, alphaPore, alphaPocket or alphaCrack. By
-  default it fills the pores whole and leaves the cracks entirely open.
+  default it fills the pores whole and leaves the cracks entirely open. A closing that cuts a part
+  apart leaves pieces of another kind, so the parts left open are classified again until nothing
+  changes; a pixel has the kind of the last part it was open in.
 
   The kinds are decided in this order: a part with Feret^2 / area >= 5 whose boundary runs along
   grains for at least half of its length is a crack; one touching the edge of the scan is a void;
@@ -119,11 +122,15 @@ def classifyNotIndexed(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None
   Output
     kinds - the kind of every pixel, an array of the map's shape: 'pore', 'pocket', 'crack',
         'void', 'speck' (a thin region, filled by alpha) or 'indexed'
-    parts - the thick parts as a dict of columns: id, kind, area in pixels, feret, the Feret
-        diameter, elong, Feret^2 / area, border, gap, the boundary cells against notIndexed cells,
-        rim, those against grains, and share, the rim share of the largest orientation
+    parts - the thick parts of every round whose kind is new, as a dict of columns: id, kind,
+        area in pixels, feret, the Feret diameter, elong, Feret^2 / area, border, gap, the
+        boundary cells against notIndexed cells, rim, those against grains, and share, the rim
+        share of the largest orientation
   Keywords
     alpha - the closing radius in pixels, 3.1 by default, or 2.2 with delaunay
+    alphaPore - the closing radius of the pores, inf by default, as calcGrains
+    alphaPocket - the closing radius of the pockets, alpha by default
+    alphaCrack - the closing radius of the cracks, 0 by default
     delaunay - the gaps filled by the alpha complex instead of the closing, as calcGrains
     angle - the misorientation angle of calcGrains, since the rim test uses its criterion
     threshold - the same as angle, which it replaces when given
@@ -137,14 +144,17 @@ def classifyNotIndexed(ebsd, angle=DEFAULT_ANGLE, threshold=None, criterion=None
     raise ValueError("the map is not on a lattice, so its notIndexed regions have no kinds")
   # an indexed pixel without rotation is notIndexed, as in calcGrains
   present = ebsd.isIndexed.reshape(-1) & ~np.isnan(ebsd.rotations.data.reshape(-1, 4)[:, 0])
-  closed, isPresent, outside, pixelOf, lo = closeLattice(l, l.plane.to2d(ebsd.pos.data.reshape(-1, 3)), present, defaultAlpha(alpha, delaunay),
-                                                         None if ebsd._pad is None else ~ebsd._pad.reshape(-1), delaunay=delaunay)[:5]
+  alpha = defaultAlpha(alpha, delaunay)
+  radii = (alphaPore, alpha if alphaPocket is None else alphaPocket, alphaCrack)
+  closed, isPresent, outside, pixelOf, lo, _, rMin = closeLattice(l, l.plane.to2d(ebsd.pos.data.reshape(-1, 3)), present, alpha,
+                                                                  None if ebsd._pad is None else ~ebsd._pad.reshape(-1),
+                                                                  max(a for a in (alpha, *radii) if np.isfinite(a)), delaunay)
 
   # the criterion on pairs of pixels
   def connects(i, j):
     return np.asarray(connectivity(crit, ebsd, i, j)) > 0
 
-  k, parts = kindOfParts(closed, isPresent, outside, pixelOf, connects, kindCodes(kinds), STENCIL[l.shape], l.A)
+  k, parts = closeKinds(closed, isPresent, outside, pixelOf, connects, kindCodes(kinds), l.A, alpha, radii, STENCIL[l.shape], rMin, l.dxy / 100)[2:]
   k = np.where(isPresent, INDEXED, np.where(k > 0, k, np.where(outside, VOID, SPECK)))
   return KINDS[k[l.ij[:, 0] - lo[0], l.ij[:, 1] - lo[1]] - 1].reshape(ebsd.shape), parts
 

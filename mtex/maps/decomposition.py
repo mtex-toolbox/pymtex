@@ -243,6 +243,41 @@ def closedAt(x, present, outside, offs):
   return closeBy(present[box], outside[box], offs)[i - r0, j - c0]
 
 
+def closeKinds(closed, present, outside, pixelOf, connects, kinds, A, alpha, radii, stencil, rMin=None, tol=0):
+  """the closing with the radius of every kind, radii of pore, pocket and crack, in place of alpha
+  on the cells of its kind: below alpha it reopens what the closing filled, 0 leaves the kind open,
+  inf fills it whole. A closing that cuts a part apart leaves pieces of another kind, so the parts
+  left open are classified again (kindOfParts with the criterion connects and the given kinds)
+  until nothing changes; what the closing of a kind has filled stays filled. Returns the closing,
+  the cells a kind's radius closed, the kind of every cell from the last part it was open in and
+  the parts of every round whose kind is new. With the alpha complex, rMin, a cell closes at a
+  radius its covering circumradius is within"""
+  dxy = (np.linalg.norm(A[:, 0]) + np.linalg.norm(A[:, 1])) / 2
+  closed, byKind, K = closed.copy(), np.zeros(closed.size, dtype=bool), np.zeros(closed.size, dtype=np.int8)
+  parts, prev = [], None
+  while prev is None or not np.array_equal(closed, prev):
+    prev = closed.copy()
+    kindP, pp, lab = kindOfParts(closed, present, outside, pixelOf, connects, kinds, stencil, A)
+    kindP, lab = kindP.reshape(-1), lab.reshape(-1)
+    kindP[byKind] = 0
+    # a cell whose kind is unchanged closes as before
+    new = (kindP > 0) & (kindP != K)
+    p = np.flatnonzero(np.bincount(lab[new], minlength=len(pp["id"]) + 1)[1:])
+    parts.append({c: v[p] for c, v in pp.items()})
+    K[new] = kindP[new]
+    for k, a in enumerate(radii, 1):
+      x = np.flatnonzero(new & (kindP == k)) if a != alpha else np.zeros(0, dtype=np.int64)
+      if rMin is not None:
+        c = rMin.reshape(-1)[x] <= a * dxy + tol
+      else:
+        c = np.ones(len(x), dtype=bool) if np.isinf(a) else closedAt(x, present, outside, diskOffsets(A, a * dxy, stencil))
+      byKind[x[c]] = True
+      closed.reshape(-1)[x] = c
+  parts = {c: np.concatenate([p[c] for p in parts]) for c in parts[0]}
+  parts["id"] = np.arange(1, len(parts["id"]) + 1)
+  return closed, byKind.reshape(closed.shape), K.reshape(closed.shape), parts
+
+
 def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None, rMin=None, tol=0):
   """a hole joined to the outside by a filled path of at most 2 ceil(alpha) steps stays joined,
   through what the largest smaller closing that keeps it joined leaves open, so that a larger
@@ -259,8 +294,9 @@ def openCorridors(closed, ext, present, outside, A, alpha, stencil, byKind=None,
   while prev is None or not np.array_equal(ext, prev):
     prev = ext
     f = closed & ~present & ~byKind
-    dHole, hole = geoDist(~closed & ~ext, f, stencil, n)
-    corridor = np.flatnonzero(f & (geoDist(ext, f, stencil, n)[0] + dHole <= n))
+    dExt = geoDist(ext, f, stencil, n)[0]
+    dHole, hole = geoDist(~closed & ~ext, f & (dExt <= n), stencil, n)
+    corridor = np.flatnonzero(f & (dExt + dHole <= n))
     for r in radii:
       corridor = corridor[closed.reshape(-1)[corridor] & ~ext.reshape(-1)[hole[corridor]]]
       if len(corridor) == 0:
@@ -403,19 +439,9 @@ def buildSites(l, P, present, alpha=3.1, measured=None, radii=None, connects=Non
   rMax = max(a for a in (alpha, *radii) if np.isfinite(a))
   closed, isPresent, outside, pixelOf, lo, cellPos, rMin = closeLattice(l, P, present, alpha, measured, rMax, delaunay, tol)
   dims = closed.shape
-  # a kind's radius replaces alpha on the cells of its kind: below alpha it reopens what the
-  # closing filled, 0 leaves the kind open, inf fills it whole; what it closes stays closed
   byKind = np.zeros(dims, dtype=bool)
   if any(a != alpha for a in radii):
-    kindP = kindOfParts(closed, isPresent, outside, pixelOf, connects, kinds, st, l.A)[0].reshape(-1)
-    for k, a in enumerate(radii, 1):
-      x = np.flatnonzero(kindP == k) if a != alpha else np.zeros(0, dtype=np.int64)
-      if rMin is not None:
-        c = rMin.reshape(-1)[x] <= a * l.dxy + tol
-      else:
-        c = np.ones(len(x), dtype=bool) if np.isinf(a) else closedAt(x, isPresent, outside, diskOffsets(l.A, a * l.dxy, st))
-      byKind.reshape(-1)[x[c]] = True
-      closed.reshape(-1)[x] = c
+    closed, byKind = closeKinds(closed, isPresent, outside, pixelOf, connects, kinds, l.A, alpha, radii, st, rMin, tol)[:2]
   closed, ext = openCorridors(closed, floodBorder(~closed, st), isPresent, outside, l.A, alpha, st, byKind, rMin, tol)
   material = ~ext
   filled = closed & ~isPresent                 # the neighbours grow into these

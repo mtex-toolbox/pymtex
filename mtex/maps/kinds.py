@@ -1,7 +1,7 @@
 # the kinds of the notIndexed parts the closing leaves open (MATLAB's kindOfParts in
 # spatialDecompositionGrid.m)
 #
-#   kindP, parts = kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, A)
+#   kindP, parts, lab = kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, A)
 #   labelCells(mask, stencil)       the connected components of a raster mask over the stencil
 #   kindCodes(kinds)                the codes of kinds given by name
 #
@@ -57,8 +57,8 @@ def _contacts(px, nb, ok, n1, n2):
 def kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, A):
   """the kind of every raster cell of the notIndexed parts the closing leaves open, 1 pore, 2
   pocket, 3 crack, 4 void and 0 elsewhere, the filled cells between two parts of a crack marked
-  crack, and the table of the parts with their measures; connects(i, j) is the criterion on pairs
-  of pixels, override a code per pixel replacing the computed kind of its part"""
+  crack, the table of the parts with their measures and the part of every cell; connects(i, j) is
+  the criterion on pairs of pixels, override a code per pixel replacing the computed kind of its part"""
   from .segment import components
 
   # the criterion on pairs of raster cells, none to judge when there are no pairs
@@ -71,14 +71,20 @@ def kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, 
   pr, out = present.reshape(-1), outside.reshape(-1)
   lab, nP = labelCells(~closed & ~outside, stencil)
   lab = lab.reshape(-1).astype(np.int64)
+  area = np.bincount(lab, minlength=nP + 1)[1:]
+  # the cells of a part next to one that is not open carry its border contact, Feret diameter
+  # and contacts
   x = np.flatnonzero(lab)
+  x = x[(lab[x[:, None] + so] == 0).any(axis=1)]
   px = lab[x] - 1
   nb = x[:, None] + so
-  area = np.bincount(px, minlength=nP)
   border = np.bincount(px, out[nb].any(axis=1), minlength=nP) > 0
-  # the notIndexed cells around every part that are not its own: the outside, the filled cells
-  # and other parts, one contact per part and cell
-  gap = np.bincount(_contacts(px, nb, ~pr[nb] & (lab[nb] != lab[x][:, None]), n1, n2)[0], minlength=nP)
+  # the cells around every part that are not open, one contact per part and cell: the notIndexed
+  # ones, the outside and the filled cells, are its gap, the indexed its rim
+  part, cell = _contacts(px, nb, lab[nb] == 0, n1, n2)
+  isRim = pr[cell]
+  gap = np.bincount(part[~isRim], minlength=nP)
+  part, cell = part[isRim], cell[isRim]
   # the Feret diameter of a part from the hull of its ideal cell positions
   xy = np.column_stack(np.divmod(x, n2)).astype(float) @ np.asarray(A, dtype=float).T
   order = np.argsort(px, kind="stable")
@@ -89,9 +95,7 @@ def kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, 
     q = q[convexHull(q)]
     feret[p] = np.sqrt(np.sum((q[:, None] - q[None]) ** 2, axis=2).max())
   elong = feret ** 2 / (area * abs(np.linalg.det(A)))
-  # the indexed cells around every part, one contact per part and cell; adjacent rim cells of one
-  # part joined where the criterion connects them
-  part, cell = _contacts(px, nb, pr[nb], n1, n2)
+  # adjacent rim cells of one part joined where the criterion connects them
   nC = len(part)
   key = part * N + cell
   o = np.argsort(key)
@@ -127,40 +131,42 @@ def kindOfParts(closed, present, outside, pixelOf, connects, override, stencil, 
   kind[(elong >= 5) & (gap <= rim)] = CRACK
   # a part takes the mode of the kinds given for its pixels, the smallest on a tie
   if override is not None:
-    k = np.where(pix[x] >= 0, override[np.maximum(pix[x], 0)], 0)
+    y = np.flatnonzero(lab)
+    k = np.where(pix[y] >= 0, override[np.maximum(pix[y], 0)], 0)
     k = np.where((k >= PORE) & (k <= VOID), k, 0)
     votes = np.zeros((nP, 5), dtype=np.int64)
-    np.add.at(votes, (px[k > 0], k[k > 0]), 1)
+    np.add.at(votes, (lab[y[k > 0]] - 1, k[k > 0]), 1)
     given = votes[:, 1:].any(axis=1)
     kind[given] = votes[given, 1:].argmax(axis=1) + 1
   # what lies between two parts of a crack is part of it: the leaves of the contact graph of the
   # parts and the filled pieces that are no crack part pruned, the parts and pieces left in a
   # component with a crack part are between
-  thin = np.flatnonzero(~pr & ~out & closed.reshape(-1))
-  ct, nT = labelCells((~present & ~outside & closed), stencil)
-  ct = ct.reshape(-1).astype(np.int64)
-  tn = thin[:, None] + so
-  ok = lab[tn] > 0
-  e = np.unique((nP + ct[thin] - 1)[:, None].repeat(len(so), axis=1)[ok] * (nP + nT) + lab[tn[ok]] - 1)
-  ea, eb = e // (nP + nT), e % (nP + nT)
-  isCrack = np.concatenate([kind == CRACK, np.zeros(nT, dtype=bool)])
-  keep = np.ones(nP + nT, dtype=bool)
-  while True:
-    kk = keep[ea] & keep[eb]
-    deg = np.bincount(ea[kk], minlength=nP + nT) + np.bincount(eb[kk], minlength=nP + nT)
-    leaf = keep & ~isCrack & (deg <= 1)
-    if not leaf.any():
-      break
-    keep[leaf] = False
-  comp = components(nP + nT, ea[kk], eb[kk])
-  between = keep & ~isCrack & np.isin(comp, comp[isCrack])
-  kind[between[:nP]] = CRACK
   kindP = np.zeros(N, dtype=np.int8)
-  kindP[x] = kind[px]
-  kindP[thin[between[nP + ct[thin] - 1]]] = CRACK
+  if (kind == CRACK).any():
+    thin = np.flatnonzero(~pr & ~out & closed.reshape(-1))
+    ct, nT = labelCells((~present & ~outside & closed), stencil)
+    ct = ct.reshape(-1).astype(np.int64)
+    tn = thin[:, None] + so
+    ok = lab[tn] > 0
+    e = np.unique((nP + ct[thin] - 1)[:, None].repeat(len(so), axis=1)[ok] * (nP + nT) + lab[tn[ok]] - 1)
+    ea, eb = e // (nP + nT), e % (nP + nT)
+    isCrack = np.concatenate([kind == CRACK, np.zeros(nT, dtype=bool)])
+    keep = np.ones(nP + nT, dtype=bool)
+    while True:
+      kk = keep[ea] & keep[eb]
+      deg = np.bincount(ea[kk], minlength=nP + nT) + np.bincount(eb[kk], minlength=nP + nT)
+      leaf = keep & ~isCrack & (deg <= 1)
+      if not leaf.any():
+        break
+      keep[leaf] = False
+    comp = components(nP + nT, ea[kk], eb[kk])
+    between = keep & ~isCrack & np.isin(comp, comp[isCrack])
+    kind[between[:nP]] = CRACK
+    kindP[thin[between[nP + ct[thin] - 1]]] = CRACK
+  kindP[lab > 0] = kind[lab[lab > 0] - 1]
   parts = dict(id=np.arange(1, nP + 1), kind=KINDS[kind - 1], area=area, feret=feret, elong=elong, border=border,
                gap=gap, rim=rim, share=share)
-  return kindP.reshape(n1, n2), parts
+  return kindP.reshape(n1, n2), parts, lab.reshape(n1, n2)
 
 
 __all__ = []

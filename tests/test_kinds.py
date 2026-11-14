@@ -59,6 +59,15 @@ def test_what_lies_between_two_parts_of_a_crack_is_crack():
   assert np.array_equal(kinds == "crack", ~e.isIndexed.reshape(96, 48) & ~corner) and np.array_equal(kinds == "speck", corner)
 
 
+def test_a_chamber_the_crack_closing_cuts_off_inside_one_grain_is_a_pore():
+  # a 7 wide crack down a 96 x 96 map of 48 pixel blocks with a chamber of radius 9.5 on its side:
+  # alphaCrack 5 fills the crack, and the chamber left open lies inside one block
+  chamber = lambda r, c: np.hypot(r - 24, c - 30) <= 9.5
+  e, r, c = blockMap(96, 96, 48, lambda r, c: ((c >= 15) & (c <= 21)) | chamber(r, c))
+  kinds = classifyNotIndexed(e, threshold=THR, alphaCrack=5)[0].reshape(96, 96)
+  assert np.all(kinds[chamber(r, c) & (c > 22)] == "pore")
+
+
 def test_a_thin_region_is_a_speck_and_a_corner_outside_the_hull_a_void():
   # a disc of radius 1.5 is filled by the closing; of a 3 x 3 corner the cells beyond the hull edge
   # from (1, 4) to (4, 1) are void, the rest filled
