@@ -461,7 +461,19 @@ def test_crystalFrame_readsTheCenteringOffTheSpaceGroup():
   assert crystalFrame("I4/mmm", [3.3, 3.3, 5.8]).centering == "I" and crystalFrame("Fm-3m", [4, 4, 4]).centering == "F"
   assert crystalFrame("Cmcm", [1, 2, 3]).centering == "C" and crystalFrame("R-3m", [1, 1, 6]).centering == "R"
   assert crystalFrame("4/mmm", [3.3, 3.3, 5.9], centering="I").centering == "I"
-  assert crystalFrame("4/mmm", [3.3, 3.3, 5.7]).centering == "P"
+
+
+def test_crystalFrame_withoutASpaceGroupHasNoCentring():
+  assert crystalFrame("4/mmm", [3.3, 3.3, 5.7]).centering is None
+
+
+def test_crystalFrame_ofATriclinicOrHexagonalLatticeIsPrimitive():
+  assert crystalFrame("-1", [1, 2, 3], [70, 80, 100]).centering == "P" and crystalFrame("6/mmm", [1, 1, 1.6]).centering == "P"
+
+
+def test_primitiveAxes_refuseALatticeOfUnknownCentring():
+  with pytest.raises(ValueError):
+    crystalFrame("m-3m", [4, 4, 4]).primitiveAxes()
 
 
 def test_crystalFrame_withoutACenteringIsTheFrameThatStatesIt():

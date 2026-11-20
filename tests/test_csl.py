@@ -46,8 +46,8 @@ def test_a_list_of_sigmas_ascends_in_sigma_then_angle():
   assert o.size == 4 and np.allclose(np.asarray(o.angle()) / degree, [60, 36.87, 22.62, 27.80], atol=0.01)
 
 
-@pytest.mark.parametrize("sym, abc", [("m-3m", [1, 1, 1]), ("6/mmm", [1, 1, np.sqrt(8 / 3)]), ("4/mmm", [1, 1, np.sqrt(2)]),
-                                      ("mmm", [1, np.sqrt(2), np.sqrt(3)]), ("-3m", [1, 1, np.sqrt(3)]), ("2/m", [1, 1.5, 2]),
+@pytest.mark.parametrize("sym, abc", [("Pm-3m", [1, 1, 1]), ("6/mmm", [1, 1, np.sqrt(8 / 3)]), ("P4/mmm", [1, 1, np.sqrt(2)]),
+                                      ("Pmmm", [1, np.sqrt(2), np.sqrt(3)]), ("P-3m1", [1, 1, np.sqrt(3)]), ("P2/m", [1, 1.5, 2]),
                                       ("R-3m", [1, 1, np.sqrt(6)]), ("I4/mmm", [1, 1, np.sqrt(3)]), ("Fmmm", [1, np.sqrt(2), np.sqrt(3)])])
 def test_every_misorientation_has_the_sigma_it_is_found_for(sym, abc):
   # sigma is the index in the Bravais lattice, counted in a primitive cell of it
@@ -99,6 +99,12 @@ def test_a_rhombohedral_lattice_has_other_coincidences_than_the_hexagonal_cell()
   assert not np.array_equal(angles(CSL(7, hP)), angles(CSL(7, hR)))
   # the letter given overrides the centring of the frame
   assert np.allclose(angles(CSL(range(1, 10), hP, "R")), angles(CSL(range(1, 10), hR)))
+
+
+def test_a_lattice_of_unknown_centring_is_refused_unless_cubic():
+  assert CSL(3, crystalFrame("m-3m")).size == 1
+  with pytest.raises(ValueError):
+    CSL(3, crystalFrame("4/mmm", [1, 1, np.sqrt(2)]))
 
 
 def test_a_centring_the_point_group_does_not_keep_is_refused():
