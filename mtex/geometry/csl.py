@@ -21,7 +21,7 @@ from math import gcd
 
 import numpy as np
 
-from .frames import CENTERING_BASES
+from .latticetype import latticeType
 from .orientation import orientation
 from .quaternion import rotation
 from .symmetryops import projectIntoFundamentalRegionOrientation
@@ -156,7 +156,7 @@ def CSL(sigma, CS, *args, delta=0):
   Any lattice is searched for the rotations that take sigma times every lattice vector onto a
   lattice vector, where MATLAB reads a table of the cubic ones. The lattice is the Bravais
   lattice of cs, centred as cs.centering says or as a letter given; the cubic P, I and F
-  lattices share their coincidences.
+  lattices share their coincidences, and any other lattice of unknown centring is refused.
 
   A metric with rational ratios, a cubic one or a hexagonal one with c^2/a^2 rational, has
   exact coincidences. With a misfit delta > 0 the metric is replaced by the one of the
@@ -184,11 +184,9 @@ def CSL(sigma, CS, *args, delta=0):
   sigmas = [int(s) for s in np.atleast_1d(sigma)]
   if any(s < 1 for s in sigmas):
     raise ValueError(f"Sigma is a positive integer, not {sigma}")
-  centering = next((a for a in args if isinstance(a, str)), CS.centering)
-  if centering not in CENTERING_BASES:
-    raise ValueError(f"the centring of a lattice is one of {', '.join(CENTERING_BASES)}, not {centering!r}")
-  T = np.asarray(CENTERING_BASES["P" if centering == "R" and abs(CS.abg[2] - 2 * np.pi / 3) > 1e-6 else centering])
-  A = (T @ CS.axes.data).T
+  # the cubic P, I and F lattices share their coincidences, so a cubic one needs no centring
+  centering = next((a for a in args if isinstance(a, str)), None) or CS.centering or ("P" if CS.lattice == latticeType.cubic else None)
+  A = CS.primitiveAxes(centering).data.T
   if delta > 0:
     A = _rationalBasis(A, delta)
   # the point group acts on the primitive cell by integer matrices, or the centring does not fit it

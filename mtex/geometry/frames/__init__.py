@@ -26,6 +26,7 @@ from ..representations import unitRows
 from .crystalaxes import alignment as _alignment, crystalAxes, isAlignment, reciprocalAxes
 from ..data.pointgroupnames import LAUE_CLASSES, POINT_GROUP_NAMES, findPointGroup, hm2point, isPointGroupName, monoclinicSetting
 from ..display import display, header, numString
+from ..latticetype import latticeType
 from ..plottingconvention import ARROWS_ASCII, ARROWS_UTF8, plottingConvention
 from ..quaternion import orthogonalTransform, quaternion, rotation
 from ..session import SESSION, getMTEXpref
@@ -947,15 +948,18 @@ class crystalFrame(referenceFrame):
   @property
   def centering(self):
     """the centring of the lattice: P primitive, A, B, C one face, I the body, F every face, R
-    rhombohedral in the hexagonal cell; P where neither a space group nor centering= stated it"""
-    return self.__dict__.get("_centering") or "P"
+    rhombohedral in the hexagonal cell; as a space group or centering= stated it, P for a
+    triclinic or hexagonal lattice, which admit no other, and None where it is unknown"""
+    return self.__dict__.get("_centering") or ("P" if self.lattice in (latticeType.triclinic, latticeType.hexagonal) else None)
 
-  def primitiveAxes(self):
-    """the axes of a primitive cell of the lattice, the conventional axes where it is primitive;
-    rhombohedral axes are primitive already"""
-    T = CENTERING_BASES[self.centering]
-    if self.centering == "R" and abs(self.abg[2] - 2 * np.pi / 3) > 1e-6:
-      T = CENTERING_BASES["P"]
+  def primitiveAxes(self, centering=None):
+    """the axes of a primitive cell of the lattice, centred as the frame states or as the letter
+    given; the conventional axes where it is primitive, rhombohedral axes are primitive already"""
+    centering = centering or self.centering
+    if centering not in CENTERING_BASES:
+      raise ValueError(f"the centring of a lattice is one of {', '.join(CENTERING_BASES)}, not {centering!r}; "
+                       "a frame states it by a space group symbol or centering=")
+    T = CENTERING_BASES["P" if centering == "R" and abs(self.abg[2] - 2 * np.pi / 3) > 1e-6 else centering]
     return vector3d(np.asarray(T) @ _basisArray(self.axes))
 
   @property
@@ -1107,7 +1111,7 @@ class crystalFrame(referenceFrame):
     al = self.alignment()
     return display(header("crystalFrame", self.conventionChar()), [
       ("mineral", self.name or None), ("color", self.color), ("symmetry", self.sym.char()), ("elements", self.numSym()),
-      ("centering", None if self.centering == "P" else self.centering),
+      ("centering", self.__dict__.get("_centering")),
       ("a, b, c", ", ".join(f"{x:.4g}" for x in self.abc)), ("alpha, beta, gamma", angles),
       ("reference frame", ", ".join(al) if al else None)])
 
